@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="50" fill="#8b0000"/>
+
+  <!-- Fortune cookie emoji as text -->
+  <text x="50" y="50"
+        font-size="60"
+        text-anchor="middle"
+        dominant-baseline="central"
+        style="font-family: system-ui, -apple-system, 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif;">🥠</text>
+</svg>
