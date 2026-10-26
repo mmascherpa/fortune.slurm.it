@@ -4,7 +4,8 @@
             API_THROTTLE_MS: 2100, // 2.1 seconds - API caches for 2s, 100ms safety margin
             API_URL: 'https://api.adviceslip.com/advice',
             PARTICLE_INTERVAL: 1000,
-            VERBOSE_LOGGING: true,
+            // Enable with ?debug in the URL
+            VERBOSE_LOGGING: new URLSearchParams(window.location.search).has('debug'),
             STORAGE_KEYS: {
                 MESSAGE_QUEUE: 'fortune_queue',
                 FORTUNE_HISTORY: 'fortune_history',
@@ -104,6 +105,12 @@
             return Array.from(numbers).sort((a, b) => a - b);
         }
 
+        // Keep every favorite plus the newest `limit` non-favorites, preserving order
+        function trimHistory(history, limit) {
+            let nonFavorites = 0;
+            return history.filter(item => item.isFavorite || ++nonFavorites <= limit);
+        }
+
         // StorageService - Handles all localStorage operations with error handling
         class StorageService {
             constructor() {
@@ -162,8 +169,8 @@
 
             clearOldHistory() {
                 const history = this.get(CONFIG.STORAGE_KEYS.FORTUNE_HISTORY, []);
-                if (history.length > 10) {
-                    const reducedHistory = history.slice(0, 10);
+                const reducedHistory = trimHistory(history, 10);
+                if (reducedHistory.length < history.length) {
                     this.set(CONFIG.STORAGE_KEYS.FORTUNE_HISTORY, reducedHistory);
                     Logger.log('Cleared old history items to free up space');
                 }
@@ -337,11 +344,12 @@
 
                 // Restore fortune history
                 if (Array.isArray(savedHistory)) {
-                    this.fortuneHistory = savedHistory.slice(0, CONFIG.MAX_HISTORY_ITEMS).map(item => ({
+                    this.fortuneHistory = savedHistory.map(item => ({
                         ...item,
                         isFavorite: item.isFavorite || false,
                         id: item.id || null
                     }));
+                    this._trimHistoryToLimit();
 
                     // Extract IDs from history and add to knownIds
                     this._extractIdsFromItems(this.fortuneHistory);
@@ -355,11 +363,10 @@
             }
 
             _trimHistoryToLimit() {
-                if (this.fortuneHistory.length > CONFIG.MAX_HISTORY_ITEMS) {
-                    this.fortuneHistory = this.fortuneHistory.slice(0, CONFIG.MAX_HISTORY_ITEMS);
-                    return true;
-                }
-                return false;
+                const trimmed = trimHistory(this.fortuneHistory, CONFIG.MAX_HISTORY_ITEMS);
+                const changed = trimmed.length !== this.fortuneHistory.length;
+                this.fortuneHistory = trimmed;
+                return changed;
             }
 
             saveToStorage() {
@@ -619,7 +626,9 @@
                 });
 
                 this.elements.historySearch.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
+                    // First Escape clears the search; Escape on an empty box closes the panel
+                    if (e.key === 'Escape' && this.elements.historySearch.value !== '') {
+                        e.stopPropagation();
                         this.elements.historySearch.value = '';
                         this.searchQuery = '';
                         this.refreshHistory();
@@ -691,16 +700,26 @@
             }
 
             highlightSearchMatches(text, query) {
+                const fragment = document.createDocumentFragment();
                 if (!query || query.trim() === '') {
-                    return text;
+                    fragment.appendChild(document.createTextNode(text));
+                    return fragment;
                 }
 
                 // Escape special regex characters
                 const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const regex = new RegExp(`(${escapedQuery})`, 'gi');
 
-                // Split text and rejoin with highlighted matches
-                return text.replace(regex, '<span class="search-highlight">$1</span>');
+                // With a capturing group, split() puts the matches at odd indexes
+                text.split(regex).forEach((part, i) => {
+                    if (!part) return;
+                    if (i % 2 === 1) {
+                        fragment.appendChild(this.createElement('span', 'search-highlight', part));
+                    } else {
+                        fragment.appendChild(document.createTextNode(part));
+                    }
+                });
+                return fragment;
             }
 
             updateAriaAttributes(element, attributes) {
@@ -762,6 +781,8 @@
             }
 
             showDeleteConfirmation(index, message) {
+                let previousFocus = document.activeElement;
+
                 // Create overlay
                 const overlay = this.createElement('div', 'confirmation-overlay', null, {
                     'role': 'dialog',
@@ -823,9 +844,17 @@
                 // Event handlers
                 const closeDialog = () => {
                     overlay.remove();
+                    // Return focus to the trigger, or to the search box if the item was deleted
+                    if (previousFocus && previousFocus.isConnected) {
+                        previousFocus.focus();
+                    } else if (this.isHistoryOpen) {
+                        this.elements.historySearch.focus();
+                    }
                 };
 
                 const handleConfirm = () => {
+                    // The trigger button is about to be removed with its card
+                    previousFocus = null;
                     if (this.deleteHandler) {
                         this.deleteHandler(index);
                     }
@@ -840,14 +869,14 @@
                     }
                 }, { preventDefault: false });
 
-                // Escape key to close
-                const escapeHandler = (e) => {
+                // Escape key to close. Bound to the overlay (removed with it) and stopped here
+                // so the document-level handler doesn't also close the history panel.
+                overlay.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
+                        e.stopPropagation();
                         closeDialog();
-                        document.removeEventListener('keydown', escapeHandler);
                     }
-                };
-                document.addEventListener('keydown', escapeHandler);
+                });
             }
 
             setDeleteHandler(handler) {
@@ -1181,19 +1210,16 @@
                     const originalIndex = historyData.indexOf(item);
                     const classes = item.isFavorite ? 'history-item favorited' : 'history-item';
                     const historyItem = this.createElement('div', classes, null, {
-                        role: 'listitem'
+                        role: 'listitem',
+                        'data-index': originalIndex
                     });
 
-                    // Highlight matching text if search is active
-                    const fortuneTextContent = this.searchQuery
-                        ? this.highlightSearchMatches(item.message, this.searchQuery)
-                        : item.message;
-
+                    // Highlight matching text if search is active (built as DOM nodes, never as HTML)
                     const fortuneText = this.createElement(
                         'div',
                         'history-fortune-text'
                     );
-                    fortuneText.innerHTML = fortuneTextContent;
+                    fortuneText.appendChild(this.highlightSearchMatches(item.message, this.searchQuery));
 
                     const luckyNumbersText = this.createElement(
                         'div',
@@ -1266,19 +1292,24 @@
             }
 
             deleteHistoryItemWithAnimation(index) {
-                const historyItems = this.elements.historyList.querySelectorAll('.history-item');
-                const itemToDelete = historyItems[index];
+                // index refers to the unfiltered history, so look the card up by its data-index
+                // rather than by its position in the (possibly filtered) list
+                const itemToDelete = this.elements.historyList.querySelector(`.history-item[data-index="${index}"]`);
+
+                const completeDeletion = () => {
+                    if (this.onDeleteComplete) {
+                        this.onDeleteComplete(index);
+                    }
+                };
 
                 if (itemToDelete) {
                     // Add deleting class for animation
                     itemToDelete.classList.add('deleting');
 
                     // Wait for animation to complete, then trigger actual deletion
-                    setTimeout(() => {
-                        if (this.onDeleteComplete) {
-                            this.onDeleteComplete(index);
-                        }
-                    }, 300); // Match animation duration
+                    setTimeout(completeDeletion, 300); // Match animation duration
+                } else {
+                    completeDeletion();
                 }
             }
 
@@ -1380,7 +1411,6 @@
                     Logger.log(`Toggled favorite at index ${index}. Now ${isFavorite ? 'favorited' : 'unfavorited'}`);
                 } catch (error) {
                     Logger.error('Error toggling favorite:', error);
-                    this.uiController.showErrorMessage('Failed to toggle favorite. Please try again.');
                 }
             }
 
