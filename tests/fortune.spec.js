@@ -1,4 +1,4 @@
-const { test, expect, crackCookie, closeFortune, openHistory } = require('./fixtures');
+const { test, expect, crackCookie, crackAnother, openHistory } = require('./fixtures');
 
 test.describe('cracking a cookie', () => {
     test.beforeEach(async ({ page }) => {
@@ -17,8 +17,7 @@ test.describe('cracking a cookie', () => {
     test('records each fortune in history and counts it', async ({ page }) => {
         await crackCookie(page);
         const first = await page.locator('#fortuneText').textContent();
-        await closeFortune(page);
-        await crackCookie(page);
+        await crackAnother(page);
         const second = await page.locator('#fortuneText').textContent();
 
         await openHistory(page);
@@ -26,17 +25,11 @@ test.describe('cracking a cookie', () => {
         await expect(page.locator('#fortuneCounter')).toHaveText('(2 collected)');
     });
 
-    test('closing the fortune brings the cookie back', async ({ page }) => {
-        await crackCookie(page);
-        await closeFortune(page);
-        await expect(page.locator('#cookieStage')).not.toHaveClass(/cracked/);
-        await expect(page.locator('#cookieContainer')).toBeFocused();
-    });
-
-    test('Escape also closes the fortune', async ({ page }) => {
+    test('Escape puts the fortune away and brings the cookie back', async ({ page }) => {
         await crackCookie(page);
         await page.keyboard.press('Escape');
         await expect(page.locator('#cookieStage')).not.toHaveClass(/cracked/);
+        await expect(page.locator('#cookieContainer')).toBeFocused();
     });
 
     test('history survives a reload', async ({ page }) => {

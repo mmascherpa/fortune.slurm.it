@@ -50,8 +50,11 @@ async function crackCookie(page) {
     await base.expect(page.locator('#fortuneText')).not.toBeEmpty();
 }
 
-async function closeFortune(page) {
-    await page.locator('#closeBtn').click();
+// Press "Crack another cookie" and wait until a different fortune is showing
+async function crackAnother(page) {
+    const previous = await page.locator('#fortuneText').textContent();
+    await page.locator('#crackAnotherBtn').click();
+    await base.expect(page.locator('#fortuneText')).not.toHaveText(previous);
 }
 
 async function openHistory(page) {
@@ -59,4 +62,4 @@ async function openHistory(page) {
     await base.expect(page.locator('#historyPanel')).toHaveAttribute('open');
 }
 
-module.exports = { test, expect: base.expect, makeHistoryItem, crackCookie, closeFortune, openHistory };
+module.exports = { test, expect: base.expect, makeHistoryItem, crackCookie, crackAnother, openHistory };

@@ -93,7 +93,7 @@ test.describe('fortune cookie semantics', () => {
     test('the hidden slip is not reachable before cracking', async ({ page }) => {
         const stops = await tabStops(page, 6);
         expect(stops).not.toContain('copyBtn');
-        expect(stops).not.toContain('closeBtn');
+        expect(stops).not.toContain('crackAnotherBtn');
         expect(await accessibleNames(page)).not.toContain('Copy fortune');
     });
 
@@ -101,7 +101,7 @@ test.describe('fortune cookie semantics', () => {
         await crackCookie(page);
         const text = await page.locator('#fortuneText').textContent();
         await expect(page.getByRole('status').filter({ hasText: 'Your fortune' })).toContainText(text);
-        await expect(page.locator('#closeBtn')).toBeFocused();
+        await expect(page.locator('#crackAnotherBtn')).toBeFocused();
         // The faded-out cookie is no longer a tab stop
         await expect(page.locator('#cookieContainer')).toHaveJSProperty('inert', true);
     });
