@@ -13,32 +13,34 @@
     <!-- History Toggle Button -->
     <button class="history-toggle"
             id="historyToggle"
-            aria-label="Open fortune history"
-            title="Open fortune history"
+            type="button"
+            aria-label="Fortune history"
+            title="Fortune history"
+            aria-haspopup="dialog"
             aria-expanded="false"
             aria-controls="historyPanel">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
     </button>
 
-    <!-- History Panel -->
-    <aside class="history-panel"
-           id="historyPanel"
-           role="complementary"
-           aria-label="Fortune History">
+    <!-- History Panel: a modal <dialog>, so the page behind it is inert while it is open -->
+    <dialog class="history-panel"
+            id="historyPanel"
+            aria-labelledby="historyTitle">
         <div class="history-header">
             <div class="history-header-top">
-                <h2 class="history-title">
+                <h2 class="history-title" id="historyTitle">
                     Fortune History <span class="fortune-counter" id="fortuneCounter">(0 collected)</span>
                 </h2>
                 <button class="history-close"
                         id="historyClose"
+                        type="button"
                         aria-label="Close fortune history"
                         title="Close fortune history">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
             </div>
             <div class="history-search-container">
-                <input type="text"
+                <input type="search"
                        id="historySearch"
                        class="history-search-input"
                        placeholder="Search fortunes..."
@@ -48,20 +50,20 @@
             <div class="history-filter">
                 <button class="filter-toggle"
                         id="filterToggle"
-                        aria-pressed="false"
-                        aria-label="Show only favorites"
-                        title="Show only favorites">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Favorites Only
+                        type="button"
+                        aria-pressed="false">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Favorites Only
                 </button>
             </div>
         </div>
-        <div class="history-list" id="historyList" role="list">
-            <p class="history-empty">No fortunes yet. Crack a cookie to begin!</p>
+        <div class="history-body">
+            <ul class="history-list" id="historyList" aria-labelledby="historyTitle"></ul>
+            <p class="history-empty" id="historyEmpty">No fortunes yet. Crack a cookie to begin!</p>
         </div>
-    </aside>
+    </dialog>
 
     <main role="main">
-        <div class="container" role="application" aria-label="Digital Fortune Cookie Game">
+        <div class="container">
             <h1 class="title">Digital Fortune Cookie</h1>
 
             <p class="sr-only" id="instructions">
@@ -69,34 +71,32 @@
                 Press Escape or use the reset button to get another fortune.
             </p>
 
-            <div class="cookie-container"
-                 id="cookieContainer"
-                 tabindex="0"
-                 role="button"
-                 aria-label="Fortune cookie. Click or press Enter to reveal your fortune."
-                 aria-describedby="instructions"
-                 aria-pressed="false">
-                <div class="cookie" id="cookie" aria-hidden="true"></div>
+            <div class="cookie-stage" id="cookieStage">
+                <button class="cookie-container"
+                        id="cookieContainer"
+                        type="button"
+                        aria-label="Crack the fortune cookie"
+                        aria-describedby="instructions">
+                    <span class="cookie" id="cookie" aria-hidden="true"></span>
+                </button>
 
-                <article class="fortune-slip"
+                <!-- inert while the cookie is closed: invisible content must not be focusable or announced -->
+                <section class="fortune-slip"
                          id="fortuneSlip"
-                         role="alert"
-                         aria-live="assertive"
-                         aria-atomic="true"
-                         aria-hidden="true"
-                         tabindex="-1">
+                         aria-label="Your fortune"
+                         inert>
                     <button class="fortune-slip-btn copy-btn"
                             id="copyBtn"
+                            type="button"
                             aria-label="Copy fortune to clipboard"
-                            title="Copy fortune to clipboard"
-                            tabindex="0">
+                            title="Copy fortune to clipboard">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                     </button>
                     <button class="fortune-slip-btn close-btn"
                             id="closeBtn"
+                            type="button"
                             aria-label="Close fortune and get another cookie"
-                            title="Close fortune and get another cookie"
-                            tabindex="0">
+                            title="Close fortune and get another cookie">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                     </button>
                     <blockquote>
@@ -106,8 +106,11 @@
                             <p class="lucky-numbers-text" id="luckyNumbers"></p>
                         </div>
                     </blockquote>
-                </article>
+                </section>
             </div>
+
+            <!-- Announces each new fortune to screen readers without stealing focus -->
+            <p class="sr-only" id="fortuneAnnouncer" role="status"></p>
 
             <a href="https://api.adviceslip.com"
                target="_blank"

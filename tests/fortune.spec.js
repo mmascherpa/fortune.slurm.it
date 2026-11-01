@@ -29,14 +29,14 @@ test.describe('cracking a cookie', () => {
     test('closing the fortune brings the cookie back', async ({ page }) => {
         await crackCookie(page);
         await closeFortune(page);
-        await expect(page.locator('#cookieContainer')).not.toHaveClass(/cracked/);
+        await expect(page.locator('#cookieStage')).not.toHaveClass(/cracked/);
         await expect(page.locator('#cookieContainer')).toBeFocused();
     });
 
     test('Escape also closes the fortune', async ({ page }) => {
         await crackCookie(page);
         await page.keyboard.press('Escape');
-        await expect(page.locator('#cookieContainer')).not.toHaveClass(/cracked/);
+        await expect(page.locator('#cookieStage')).not.toHaveClass(/cracked/);
     });
 
     test('history survives a reload', async ({ page }) => {

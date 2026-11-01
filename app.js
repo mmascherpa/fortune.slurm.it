@@ -569,7 +569,9 @@
 
             initializeElements() {
                 return {
+                    cookieStage: document.getElementById('cookieStage'),
                     cookieContainer: document.getElementById('cookieContainer'),
+                    fortuneAnnouncer: document.getElementById('fortuneAnnouncer'),
                     cookie: document.getElementById('cookie'),
                     fortuneSlip: document.getElementById('fortuneSlip'),
                     fortuneText: document.getElementById('fortuneText'),
@@ -580,6 +582,7 @@
                     historyPanel: document.getElementById('historyPanel'),
                     historyClose: document.getElementById('historyClose'),
                     historyList: document.getElementById('historyList'),
+                    historyEmpty: document.getElementById('historyEmpty'),
                     fortuneCounter: document.getElementById('fortuneCounter'),
                     filterToggle: document.getElementById('filterToggle'),
                     historySearch: document.getElementById('historySearch')
@@ -587,7 +590,8 @@
             }
 
             setupEventListeners() {
-                this.addAccessibleClickHandler(this.elements.cookieContainer, () => {
+                // A native <button>: click already covers mouse, touch, Enter and Space
+                this.elements.cookieContainer.addEventListener('click', () => {
                     if (!this.isCracked) {
                         this.onCookieClick();
                     }
@@ -626,22 +630,32 @@
                 });
 
                 this.elements.historySearch.addEventListener('keydown', (e) => {
-                    // First Escape clears the search; Escape on an empty box closes the panel
+                    // First Escape clears the search; Escape on an empty box closes the panel.
+                    // preventDefault stops the dialog's built-in Escape-to-close for this press.
                     if (e.key === 'Escape' && this.elements.historySearch.value !== '') {
-                        e.stopPropagation();
+                        e.preventDefault();
                         this.elements.historySearch.value = '';
                         this.searchQuery = '';
                         this.refreshHistory();
                     }
                 });
 
+                const panel = this.elements.historyPanel;
+
+                // The dialog closes itself on Escape; keep our state and focus in step however it closes
+                panel.addEventListener('close', () => this.onHistoryClosed());
+
+                // A click on the dimmed backdrop targets the dialog element itself
+                panel.addEventListener('click', (e) => {
+                    if (e.target === panel) {
+                        this.closeHistory();
+                    }
+                });
+
                 document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        if (this.isHistoryOpen) {
-                            this.closeHistory();
-                        } else if (this.isCracked) {
-                            this.resetCookie();
-                        }
+                    // Open dialogs handle their own Escape
+                    if (e.key === 'Escape' && this.isCracked && !document.querySelector('dialog[open]')) {
+                        this.resetCookie();
                     }
                 });
             }
@@ -781,19 +795,14 @@
             }
 
             showDeleteConfirmation(index, message) {
-                let previousFocus = document.activeElement;
-
-                // Create overlay
-                const overlay = this.createElement('div', 'confirmation-overlay', null, {
-                    'role': 'dialog',
-                    'aria-modal': 'true',
-                    'aria-labelledby': 'confirmTitle'
+                // A native modal <dialog>: it stacks above the history dialog, makes everything
+                // behind it inert, closes on Escape and returns focus to the trigger when closed
+                const dialog = this.createElement('dialog', 'confirmation-dialog', null, {
+                    'role': 'alertdialog',
+                    'aria-labelledby': 'confirmTitle',
+                    'aria-describedby': 'confirmMessage'
                 });
 
-                // Create dialog
-                const dialog = this.createElement('div', 'confirmation-dialog');
-
-                // Title
                 const title = this.createElement('h3', 'confirmation-title', 'Delete Fortune?', {
                     'id': 'confirmTitle'
                 });
@@ -806,7 +815,8 @@
                 const dialogMessage = this.createElement(
                     'p',
                     'confirmation-message',
-                    'Are you sure you want to delete this fortune?'
+                    'Are you sure you want to delete this fortune?',
+                    { 'id': 'confirmMessage' }
                 );
 
                 const fortunePreview = this.createElement(
@@ -815,68 +825,51 @@
                     `"${messagePreview}"`
                 );
 
-                // Buttons container
                 const buttonsContainer = this.createElement('div', 'confirmation-buttons');
 
-                // Cancel button
+                // Cancel comes first and gets initial focus: the safe choice for a destructive action
                 const cancelBtn = this.createElement('button', 'confirmation-btn confirmation-btn-cancel', 'Cancel', {
-                    'aria-label': 'Cancel deletion'
+                    'type': 'button',
+                    'autofocus': ''
                 });
 
-                // Confirm button
                 const confirmBtn = this.createElement('button', 'confirmation-btn confirmation-btn-confirm', 'Delete', {
-                    'aria-label': 'Confirm deletion'
+                    'type': 'button'
                 });
 
-                // Assemble dialog
                 buttonsContainer.appendChild(cancelBtn);
                 buttonsContainer.appendChild(confirmBtn);
                 dialog.appendChild(title);
                 dialog.appendChild(dialogMessage);
                 dialog.appendChild(fortunePreview);
                 dialog.appendChild(buttonsContainer);
-                overlay.appendChild(dialog);
-                document.body.appendChild(overlay);
+                document.body.appendChild(dialog);
 
-                // Focus confirm button
-                setTimeout(() => confirmBtn.focus(), 100);
+                let confirmed = false;
 
-                // Event handlers
-                const closeDialog = () => {
-                    overlay.remove();
-                    // Return focus to the trigger, or to the search box if the item was deleted
-                    if (previousFocus && previousFocus.isConnected) {
-                        previousFocus.focus();
-                    } else if (this.isHistoryOpen) {
+                dialog.addEventListener('close', () => {
+                    dialog.remove();
+                    if (confirmed) {
+                        // The trigger button goes away with its card, so focus the search box instead
                         this.elements.historySearch.focus();
-                    }
-                };
-
-                const handleConfirm = () => {
-                    // The trigger button is about to be removed with its card
-                    previousFocus = null;
-                    if (this.deleteHandler) {
-                        this.deleteHandler(index);
-                    }
-                    closeDialog();
-                };
-
-                this.addAccessibleClickHandler(cancelBtn, closeDialog, { stopPropagation: true });
-                this.addAccessibleClickHandler(confirmBtn, handleConfirm, { stopPropagation: true });
-                this.addAccessibleClickHandler(overlay, (e) => {
-                    if (e.target === overlay) {
-                        closeDialog();
-                    }
-                }, { preventDefault: false });
-
-                // Escape key to close. Bound to the overlay (removed with it) and stopped here
-                // so the document-level handler doesn't also close the history panel.
-                overlay.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        e.stopPropagation();
-                        closeDialog();
+                        if (this.deleteHandler) {
+                            this.deleteHandler(index);
+                        }
                     }
                 });
+
+                cancelBtn.addEventListener('click', () => dialog.close());
+                confirmBtn.addEventListener('click', () => {
+                    confirmed = true;
+                    dialog.close();
+                });
+                dialog.addEventListener('click', (e) => {
+                    if (e.target === dialog) {
+                        dialog.close();
+                    }
+                });
+
+                dialog.showModal();
             }
 
             setDeleteHandler(handler) {
@@ -895,43 +888,38 @@
 
             showFortune(message, luckyNumbers = null) {
                 this.isCracked = true;
-                this.elements.cookieContainer.classList.add('cracked');
+                this.elements.cookieStage.classList.add('cracked');
                 this.elements.fortuneText.textContent = message;
 
                 // Generate or use provided lucky numbers
                 const numbers = luckyNumbers || generateLuckyNumbers();
                 this.elements.luckyNumbers.textContent = numbers.join(', ');
 
-                // Update ARIA attributes for accessibility
-                this.updateAriaAttributes(this.elements.cookieContainer, {
-                    'aria-pressed': 'true',
-                    'aria-label': 'Fortune cookie cracked. Your fortune is being displayed.'
-                });
-                this.updateAriaAttributes(this.elements.fortuneSlip, {
-                    'aria-hidden': 'false'
-                });
+                // The faded-out cookie stays in place for the animation but leaves the
+                // keyboard and accessibility tree; the slip enters them
+                this.elements.cookieContainer.inert = true;
+                this.elements.fortuneSlip.inert = false;
 
-                // Move focus to close button for keyboard users
-                setTimeout(() => {
+                this.elements.fortuneAnnouncer.textContent = `Your fortune: ${message} Lucky numbers: ${numbers.join(', ')}.`;
+
+                // Move focus to the slip once it has appeared, so keyboard users land on its actions
+                clearTimeout(this.slipFocusTimer);
+                this.slipFocusTimer = setTimeout(() => {
                     this.elements.closeBtn.focus();
                 }, CONFIG.TIMEOUTS.CLOSE_BUTTON_FOCUS_DELAY);
             }
 
             resetCookie() {
                 this.isCracked = false;
-                this.elements.cookieContainer.classList.remove('cracked');
+                clearTimeout(this.slipFocusTimer);
+                this.elements.cookieStage.classList.remove('cracked');
                 this.elements.cookie.classList.add('visible');
 
-                // Restore ARIA attributes for accessibility
-                this.updateAriaAttributes(this.elements.cookieContainer, {
-                    'aria-pressed': 'false',
-                    'aria-label': 'Fortune cookie. Click or press Enter to reveal your fortune.'
-                });
-                this.updateAriaAttributes(this.elements.fortuneSlip, {
-                    'aria-hidden': 'true'
-                });
+                this.elements.fortuneSlip.inert = true;
+                this.elements.cookieContainer.inert = false;
+                this.elements.fortuneAnnouncer.textContent = '';
 
-                // Return focus to cookie container for keyboard users
+                // Return focus to the cookie for keyboard users
                 this.elements.cookieContainer.focus();
             }
 
@@ -1106,23 +1094,10 @@
             toggleFavoritesFilter() {
                 this.showFavoritesOnly = !this.showFavoritesOnly;
 
-                // Update button state
+                // A toggle button keeps its label; aria-pressed carries the on/off state
                 const button = this.elements.filterToggle;
-                const starIcon = this.createIcon('star', 14, 'vertical-align: -2px; margin-right: 4px;');
-
-                if (this.showFavoritesOnly) {
-                    button.classList.add('active');
-                    button.setAttribute('aria-pressed', 'true');
-                    button.innerHTML = starIcon + 'Show All';
-                    button.setAttribute('aria-label', 'Show all fortunes');
-                    button.setAttribute('title', 'Show all fortunes');
-                } else {
-                    button.classList.remove('active');
-                    button.setAttribute('aria-pressed', 'false');
-                    button.innerHTML = starIcon + 'Favorites Only';
-                    button.setAttribute('aria-label', 'Show only favorites');
-                    button.setAttribute('title', 'Show only favorites');
-                }
+                button.classList.toggle('active', this.showFavoritesOnly);
+                button.setAttribute('aria-pressed', String(this.showFavoritesOnly));
 
                 // Refresh history with filter
                 this.refreshHistory();
@@ -1132,28 +1107,31 @@
 
             openHistory() {
                 this.isHistoryOpen = true;
-                this.elements.historyPanel.classList.add('open');
-                this.elements.historyToggle.setAttribute('aria-expanded', 'true');
-                this.elements.historyToggle.setAttribute('aria-label', 'Close fortune history');
 
-                // Populate history when opening
+                // Populate history before showing it
                 if (this.historyDataProvider) {
                     this.renderHistory(this.historyDataProvider());
                 }
 
-                // Focus on search input when opened (for better UX)
-                setTimeout(() => {
+                // Modal: dims and disables the page behind it until closed
+                this.elements.historyPanel.showModal();
+                this.elements.historyToggle.setAttribute('aria-expanded', 'true');
+
+                // Start in the search box with a mouse or trackpad. On touch screens that would
+                // pop up the keyboard, so leave the dialog's default focus (the close button).
+                if (window.matchMedia('(pointer: fine)').matches) {
                     this.elements.historySearch.focus();
-                }, 100);
+                }
             }
 
             closeHistory() {
-                this.isHistoryOpen = false;
-                this.elements.historyPanel.classList.remove('open');
-                this.elements.historyToggle.setAttribute('aria-expanded', 'false');
-                this.elements.historyToggle.setAttribute('aria-label', 'Open fortune history');
+                this.elements.historyPanel.close();
+            }
 
-                // Return focus to toggle button
+            // Runs however the dialog closes: close button, Escape or backdrop click
+            onHistoryClosed() {
+                this.isHistoryOpen = false;
+                this.elements.historyToggle.setAttribute('aria-expanded', 'false');
                 this.elements.historyToggle.focus();
             }
 
@@ -1163,9 +1141,17 @@
 
             renderHistory(historyData) {
                 const listElement = this.elements.historyList;
+                const emptyElement = this.elements.historyEmpty;
+
+                const showEmpty = (text) => {
+                    listElement.replaceChildren();
+                    listElement.hidden = true;
+                    emptyElement.textContent = text;
+                    emptyElement.hidden = false;
+                };
 
                 if (!historyData || historyData.length === 0) {
-                    listElement.innerHTML = '<p class="history-empty">No fortunes yet. Crack a cookie to begin!</p>';
+                    showEmpty('No fortunes yet. Crack a cookie to begin!');
                     return;
                 }
 
@@ -1197,20 +1183,20 @@
                     } else {
                         emptyMessage = 'No fortunes yet. Crack a cookie to begin!';
                     }
-                    listElement.innerHTML = `<p class="history-empty">${emptyMessage}</p>`;
+                    showEmpty(emptyMessage);
                     return;
                 }
 
-                // Clear existing content
-                listElement.innerHTML = '';
+                emptyElement.hidden = true;
+                listElement.hidden = false;
+                listElement.replaceChildren();
 
                 // Render each history item (use original index for operations)
                 filteredData.forEach((item) => {
                     // Find the original index in the unfiltered data
                     const originalIndex = historyData.indexOf(item);
                     const classes = item.isFavorite ? 'history-item favorited' : 'history-item';
-                    const historyItem = this.createElement('div', classes, null, {
-                        role: 'listitem',
+                    const historyItem = this.createElement('li', classes, null, {
                         'data-index': originalIndex
                     });
 
