@@ -23,7 +23,7 @@ test.describe('cracking a cookie', () => {
 
         await openHistory(page);
         await expect(page.locator('.history-fortune-text')).toHaveText([second, first]);
-        await expect(page.locator('#fortuneCounter')).toHaveText('(2 collected)');
+        await expect(page.locator('#fortuneCounter')).toHaveText('2 cookies cracked so far');
     });
 
     test('closing the fortune brings the cookie back', async ({ page }) => {
