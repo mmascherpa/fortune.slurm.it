@@ -561,6 +561,70 @@
         }
 
         /* Modal <dialog> styled as a side sheet on the right */
+        .crumbs-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            /* Above the background, below the fortune slip (z-index 10) so text stays clean */
+            z-index: 5;
+        }
+
+        .sound-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(139, 0, 0, 0.3);
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            color: rgba(255, 215, 0, 0.75);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            z-index: 999;
+        }
+
+        .sound-toggle:hover {
+            background: rgba(139, 0, 0, 0.5);
+            border-color: rgba(255, 215, 0, 0.6);
+            color: #ffd700;
+        }
+
+        .sound-toggle:focus-visible {
+            outline: 2px solid #ffd700;
+            outline-offset: 2px;
+        }
+
+        .sound-toggle.active {
+            color: #ffd700;
+            border-color: rgba(255, 215, 0, 0.7);
+        }
+
+        .sound-toggle .icon-sound-on,
+        .sound-toggle.active .icon-sound-off {
+            display: none;
+        }
+
+        .sound-toggle.active .icon-sound-on {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .sound-toggle {
+                top: 10px;
+                left: 10px;
+                width: 45px;
+                height: 45px;
+            }
+        }
+
         .history-panel {
             position: fixed;
             inset: 0 0 0 auto;

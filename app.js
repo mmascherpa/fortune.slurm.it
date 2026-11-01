@@ -13,7 +13,8 @@
                 API_STATE: 'fortune_api_state',
                 VERSION: 'fortune_storage_version',
                 SHOW_FAVORITES_ONLY: 'show_favorites_only',
-                KNOWN_IDS: 'fortune_known_ids'
+                KNOWN_IDS: 'fortune_known_ids',
+                SOUND_ENABLED: 'fortune_sound_enabled'
             },
             STORAGE_VERSION: 1,
             MAX_HISTORY_ITEMS: 20,
@@ -44,6 +45,10 @@
                     title: 'API Status: Offline - Using cached messages',
                     ariaLabel: 'API Status: Offline - Using cached messages'
                 }
+            },
+            EFFECTS: {
+                CRACK_DELAY: 450, // as the cookie's shake animation ends
+                VIBRATION_PATTERN: [25, 30, 40]
             },
             API_SETTINGS: {
                 INITIAL_BACKOFF_DELAY: 1000,
@@ -1308,6 +1313,120 @@
             }
         }
 
+        // Crumbs, crunch and buzz when a cookie cracks. Sound and vibration are off until the
+        // visitor turns them on; crumbs follow the reduced-motion setting.
+        class EffectsController {
+            constructor(storageService, toggleButton, crumbsCanvas) {
+                this.storageService = storageService;
+                this.toggleButton = toggleButton;
+                // Draw on our own decorative canvas (hidden from assistive technology) rather
+                // than one the library adds. The library is loaded separately; the site works without it.
+                this.throwConfetti = typeof window.confetti === 'function'
+                    ? window.confetti.create(crumbsCanvas, { resize: true, disableForReducedMotion: true })
+                    : null;
+                this.audioContext = null;
+                this.soundEnabled = this.storageService.get(CONFIG.STORAGE_KEYS.SOUND_ENABLED, false) === true;
+                this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+                this.renderToggle();
+                this.toggleButton.addEventListener('click', () => this.toggleSound());
+            }
+
+            toggleSound() {
+                this.soundEnabled = !this.soundEnabled;
+                this.storageService.set(CONFIG.STORAGE_KEYS.SOUND_ENABLED, this.soundEnabled);
+                this.renderToggle();
+                // A short crunch as a preview, which also unlocks audio inside this click
+                if (this.soundEnabled) {
+                    this.playCrunch();
+                }
+            }
+
+            renderToggle() {
+                this.toggleButton.setAttribute('aria-pressed', String(this.soundEnabled));
+                this.toggleButton.classList.toggle('active', this.soundEnabled);
+                this.toggleButton.title = this.soundEnabled ? 'Sound effects: on' : 'Sound effects: off';
+            }
+
+            // Called when a cookie is cracked; the crack lands as the shake animation ends
+            crack(cookieElement) {
+                const delay = this.reducedMotion.matches ? 0 : CONFIG.EFFECTS.CRACK_DELAY;
+                const rect = cookieElement.getBoundingClientRect();
+
+                setTimeout(() => {
+                    this.throwCrumbs(rect);
+                    if (this.soundEnabled) {
+                        this.playCrunch();
+                        if (typeof navigator.vibrate === 'function') {
+                            navigator.vibrate(CONFIG.EFFECTS.VIBRATION_PATTERN);
+                        }
+                    }
+                }, delay);
+            }
+
+            throwCrumbs(rect) {
+                if (!this.throwConfetti) return;
+                this.throwConfetti({
+                    particleCount: 36,
+                    spread: 80,
+                    startVelocity: 22,
+                    gravity: 1.1,
+                    decay: 0.9,
+                    ticks: 140,
+                    scalar: 0.9,
+                    shapes: ['circle', 'square'],
+                    colors: ['#e8b04a', '#d4943a', '#f5d38a', '#b8742a', '#fff3c4'],
+                    origin: {
+                        x: (rect.left + rect.width / 2) / window.innerWidth,
+                        y: (rect.top + rect.height / 2) / window.innerHeight
+                    },
+                });
+            }
+
+            // A synthesised crunch: three short bursts of filtered noise, each fading out
+            playCrunch() {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+
+                try {
+                    if (!this.audioContext) {
+                        this.audioContext = new AudioContextClass();
+                    }
+                    const ctx = this.audioContext;
+                    if (ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
+
+                    const now = ctx.currentTime;
+                    [0, 0.05, 0.11].forEach((offset, i) => {
+                        const duration = 0.07;
+                        const length = Math.floor(ctx.sampleRate * duration);
+                        const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+                        const data = buffer.getChannelData(0);
+                        for (let j = 0; j < length; j++) {
+                            data[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / length, 3);
+                        }
+
+                        const source = ctx.createBufferSource();
+                        source.buffer = buffer;
+                        const filter = ctx.createBiquadFilter();
+                        filter.type = 'bandpass';
+                        filter.frequency.value = 1600 + i * 700 + Math.random() * 400;
+                        filter.Q.value = 1.2;
+                        const gain = ctx.createGain();
+                        gain.gain.value = 0.45 - i * 0.1;
+
+                        source.connect(filter);
+                        filter.connect(gain);
+                        gain.connect(ctx.destination);
+                        source.start(now + offset);
+                    });
+                } catch (error) {
+                    Logger.warn('Could not play sound:', error.message);
+                }
+            }
+        }
+
         class FortuneApp {
             constructor() {
                 this.storageService = new StorageService();
@@ -1316,6 +1435,11 @@
                 this.apiService = new APIService(this.storageService);
                 this.messageManager = new MessageManager(this.apiService, this.storageService);
                 this.uiController = new UIController();
+                this.effects = new EffectsController(
+                    this.storageService,
+                    document.getElementById('soundToggle'),
+                    document.getElementById('crumbsCanvas')
+                );
 
                 this.setupIntegration();
                 this.setupAutoSave();
@@ -1375,6 +1499,7 @@
                     const luckyNumbers = generateLuckyNumbers();
                     this.messageManager.addToHistory(message, luckyNumbers, id);
                     this.uiController.showFortune(message, luckyNumbers);
+                    this.effects.crack(this.uiController.elements.cookieContainer);
 
                     // Update fortune counter
                     const count = this.messageManager.getFortuneCount();
