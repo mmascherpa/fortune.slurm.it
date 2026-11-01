@@ -24,7 +24,8 @@
                 REFILL_SCHEDULE_DELAY: 100,
                 INITIAL_ANIMATION_DURATION: 1500,
                 PARTICLE_CLEANUP: 5000,
-                TOAST_DURATION: 2500
+                TOAST_DURATION: 2500,
+                UNDO_DURATION: 5000
             },
             STATUS_STYLES: {
                 success: {
@@ -427,17 +428,27 @@
                 return this.fortuneHistory.find(item => item.uid === uid) || null;
             }
 
+            // Returns { item, index } so the deletion can be undone, or null if not found
             deleteHistoryItem(uid) {
                 const index = this.fortuneHistory.findIndex(item => item.uid === uid);
                 if (index === -1) {
-                    return false;
+                    return null;
                 }
-                this.fortuneHistory.splice(index, 1);
+                const [item] = this.fortuneHistory.splice(index, 1);
 
                 this.dataChanged = true;
                 this.saveToStorage();
                 Logger.log(`Deleted history item ${uid}`);
-                return true;
+                return { item, index };
+            }
+
+            restoreHistoryItem({ item, index }) {
+                if (this.getHistoryItem(item.uid)) return;
+                this.fortuneHistory.splice(Math.min(index, this.fortuneHistory.length), 0, item);
+
+                this.dataChanged = true;
+                this.saveToStorage();
+                Logger.log(`Restored history item ${item.uid}`);
             }
 
             // Returns the new favourite state, or null if the entry no longer exists
@@ -784,15 +795,21 @@
                 return copyBtn;
             }
 
-            createHistoryDeleteButton(uid, message) {
+            createHistoryDeleteButton(uid) {
                 const deleteBtn = this.createElement('button', 'history-btn history-delete-btn', null, {
                     'aria-label': 'Delete this fortune from history',
                     'title': 'Delete this fortune from history'
                 });
                 deleteBtn.innerHTML = this.createIcon('trash', 16);
 
-                this.addAccessibleClickHandler(deleteBtn, () => {
-                    this.showDeleteConfirmation(uid, message);
+                this.addAccessibleClickHandler(deleteBtn, (e) => {
+                    // Ignore repeat clicks while the card is already sliding out
+                    if (deleteBtn.closest('.history-item').classList.contains('deleting')) return;
+                    // Keyboard activation arrives as keydown, or as a click with no pointer (detail 0)
+                    const viaKeyboard = !(e instanceof MouseEvent) || e.detail === 0;
+                    if (this.deleteHandler) {
+                        this.deleteHandler(uid, { viaKeyboard });
+                    }
                 });
 
                 return deleteBtn;
@@ -818,84 +835,6 @@
                 });
 
                 return favoriteBtn;
-            }
-
-            showDeleteConfirmation(uid, message) {
-                // A native modal <dialog>: it stacks above the history dialog, makes everything
-                // behind it inert, closes on Escape and returns focus to the trigger when closed
-                const dialog = this.createElement('dialog', 'confirmation-dialog', null, {
-                    'role': 'alertdialog',
-                    'aria-labelledby': 'confirmTitle',
-                    'aria-describedby': 'confirmMessage'
-                });
-
-                const title = this.createElement('h3', 'confirmation-title', 'Delete Fortune?', {
-                    'id': 'confirmTitle'
-                });
-
-                // Message preview
-                const messagePreview = message.length > 60
-                    ? message.substring(0, 60) + '...'
-                    : message;
-
-                const dialogMessage = this.createElement(
-                    'p',
-                    'confirmation-message',
-                    'Are you sure you want to delete this fortune?',
-                    { 'id': 'confirmMessage' }
-                );
-
-                const fortunePreview = this.createElement(
-                    'p',
-                    'confirmation-fortune-preview',
-                    `"${messagePreview}"`
-                );
-
-                const buttonsContainer = this.createElement('div', 'confirmation-buttons');
-
-                // Cancel comes first and gets initial focus: the safe choice for a destructive action
-                const cancelBtn = this.createElement('button', 'confirmation-btn confirmation-btn-cancel', 'Cancel', {
-                    'type': 'button',
-                    'autofocus': ''
-                });
-
-                const confirmBtn = this.createElement('button', 'confirmation-btn confirmation-btn-confirm', 'Delete', {
-                    'type': 'button'
-                });
-
-                buttonsContainer.appendChild(cancelBtn);
-                buttonsContainer.appendChild(confirmBtn);
-                dialog.appendChild(title);
-                dialog.appendChild(dialogMessage);
-                dialog.appendChild(fortunePreview);
-                dialog.appendChild(buttonsContainer);
-                document.body.appendChild(dialog);
-
-                let confirmed = false;
-
-                dialog.addEventListener('close', () => {
-                    dialog.remove();
-                    if (confirmed) {
-                        // The trigger button goes away with its card, so focus the search box instead
-                        this.elements.historySearch.focus();
-                        if (this.deleteHandler) {
-                            this.deleteHandler(uid);
-                        }
-                    }
-                });
-
-                cancelBtn.addEventListener('click', () => dialog.close());
-                confirmBtn.addEventListener('click', () => {
-                    confirmed = true;
-                    dialog.close();
-                });
-                dialog.addEventListener('click', (e) => {
-                    if (e.target === dialog) {
-                        dialog.close();
-                    }
-                });
-
-                dialog.showModal();
             }
 
             setDeleteHandler(handler) {
@@ -1158,6 +1097,8 @@
 
             // Runs however the dialog closes: close button, Escape or backdrop click
             onHistoryClosed() {
+                // A pending Undo goes with the drawer; the deletion stands
+                this.hideToast();
                 this.isHistoryOpen = false;
                 this.elements.historyToggle.setAttribute('aria-expanded', 'false');
                 this.elements.historyToggle.focus();
@@ -1250,7 +1191,7 @@
                     const actions = this.createElement('div', 'history-item-actions');
                     const favoriteBtn = this.createHistoryFavoriteButton(item.uid, item.isFavorite || false);
                     const copyBtn = this.createHistoryCopyButton(item.message);
-                    const deleteBtn = this.createHistoryDeleteButton(item.uid, item.message);
+                    const deleteBtn = this.createHistoryDeleteButton(item.uid);
 
                     actions.appendChild(favoriteBtn);
                     actions.appendChild(copyBtn);
@@ -1315,12 +1256,12 @@
                 }, 300);
             }
 
-            deleteHistoryItemWithAnimation(uid) {
+            deleteHistoryItemWithAnimation(uid, options) {
                 const itemToDelete = this.elements.historyList.querySelector(`.history-item[data-uid="${CSS.escape(uid)}"]`);
 
                 const completeDeletion = () => {
                     if (this.onDeleteComplete) {
-                        this.onDeleteComplete(uid);
+                        this.onDeleteComplete(uid, options);
                     }
                 };
 
@@ -1356,22 +1297,80 @@
                 this.elements.historyCount.textContent = count;
             }
 
-            // Brief confirmation, shown visually and announced politely. When a dialog is open
-            // everything outside it is inert, so the drawer has its own message area.
-            showToast(message) {
-                const region = this.isHistoryOpen ? this.elements.historyToast : this.elements.toast;
-                const other = region === this.elements.toast ? this.elements.historyToast : this.elements.toast;
-                other.classList.remove('visible');
-                other.textContent = '';
+            // Brief confirmation, shown visually and announced politely, optionally with an
+            // action button such as Undo. When a dialog is open everything outside it is inert,
+            // so the drawer has its own message area. Returns the action button, if any.
+            showToast(message, { actionLabel = null, onAction = null, duration = CONFIG.TIMEOUTS.TOAST_DURATION } = {}) {
+                this.hideToast();
 
-                region.textContent = message;
+                const region = this.isHistoryOpen ? this.elements.historyToast : this.elements.toast;
+                const text = this.createElement('span', 'toast-text', message);
+                region.replaceChildren(text);
+
+                let actionButton = null;
+                if (actionLabel) {
+                    actionButton = this.createElement('button', 'toast-action', actionLabel, { 'type': 'button' });
+                    actionButton.addEventListener('click', () => {
+                        this.hideToast();
+                        if (onAction) onAction();
+                    });
+                    region.appendChild(actionButton);
+                }
                 region.classList.add('visible');
 
-                clearTimeout(this.toastTimer);
-                this.toastTimer = setTimeout(() => {
-                    region.classList.remove('visible');
-                    region.textContent = '';
-                }, CONFIG.TIMEOUTS.TOAST_DURATION);
+                // Stay up while the pointer is over the message or a keyboard user is on its
+                // button (WCAG 2.2.1), and count down the remaining time once they leave
+                const toast = { region, remaining: duration, startedAt: 0, timer: null, hovered: false, focused: false, listeners: null };
+                const start = () => {
+                    if (toast.hovered || toast.focused || toast.timer) return;
+                    toast.startedAt = Date.now();
+                    toast.timer = setTimeout(() => this.hideToast(), toast.remaining);
+                };
+                const pause = () => {
+                    if (!toast.timer) return;
+                    clearTimeout(toast.timer);
+                    toast.timer = null;
+                    toast.remaining -= Date.now() - toast.startedAt;
+                };
+                // (focusin/focusout have no on* properties, so use listeners, removed on hide)
+                toast.listeners = new AbortController();
+                const { signal } = toast.listeners;
+                region.addEventListener('mouseenter', () => { toast.hovered = true; pause(); }, { signal });
+                region.addEventListener('mouseleave', () => { toast.hovered = false; start(); }, { signal });
+                region.addEventListener('focusin', () => { toast.focused = true; pause(); }, { signal });
+                region.addEventListener('focusout', (e) => {
+                    if (region.contains(e.relatedTarget)) return;
+                    toast.focused = false;
+                    start();
+                }, { signal });
+
+                this.activeToast = toast;
+                start();
+                return actionButton;
+            }
+
+            hideToast() {
+                const toast = this.activeToast;
+                if (!toast) return;
+                this.activeToast = null;
+                clearTimeout(toast.timer);
+
+                const { region } = toast;
+                const hadFocus = region.contains(document.activeElement);
+                toast.listeners.abort();
+                region.classList.remove('visible');
+                region.replaceChildren();
+
+                // Don't leave keyboard focus on a button that just disappeared
+                if (hadFocus && this.isHistoryOpen) {
+                    this.elements.historySearch.focus();
+                }
+            }
+
+            focusHistoryDeleteButton(uid) {
+                const button = this.elements.historyList.querySelector(
+                    `.history-item[data-uid="${CSS.escape(uid)}"] .history-delete-btn`);
+                if (button) button.focus();
             }
         }
 
@@ -1403,12 +1402,12 @@
                 });
 
                 // Set up delete handler
-                this.uiController.setDeleteHandler((uid) => {
-                    this.uiController.deleteHistoryItemWithAnimation(uid);
+                this.uiController.setDeleteHandler((uid, options) => {
+                    this.uiController.deleteHistoryItemWithAnimation(uid, options);
                 });
 
-                this.uiController.setOnDeleteComplete((uid) => {
-                    this.handleDeleteHistoryItem(uid);
+                this.uiController.setOnDeleteComplete((uid, options) => {
+                    this.handleDeleteHistoryItem(uid, options);
                 });
 
                 this.uiController.setOnToggleFavorite((uid) => {
@@ -1475,21 +1474,43 @@
                 }
             }
 
-            handleDeleteHistoryItem(uid) {
+            handleDeleteHistoryItem(uid, { viaKeyboard = false } = {}) {
                 try {
-                    const success = this.messageManager.deleteHistoryItem(uid);
-                    if (success) {
-                        this.uiController.setSlipFavourite(uid, false);
-                        this.updateCounts();
-                        this.uiController.refreshHistory();
-
-                        Logger.log(`Successfully deleted history item ${uid}`);
-                    } else {
+                    const removed = this.messageManager.deleteHistoryItem(uid);
+                    if (!removed) {
                         Logger.error(`Failed to delete history item ${uid}`);
+                        return;
                     }
+                    this.uiController.setSlipFavourite(uid, false);
+                    this.updateCounts();
+                    this.uiController.refreshHistory();
+
+                    const undoButton = this.uiController.showToast('Fortune deleted', {
+                        actionLabel: 'Undo',
+                        duration: CONFIG.TIMEOUTS.UNDO_DURATION,
+                        onAction: () => this.handleUndoDelete(removed)
+                    });
+                    // Keyboard focus was on the delete button, which went with its card: move it
+                    // to Undo, which then stays up until focus leaves it. Pointer users keep
+                    // the timed message.
+                    if (viaKeyboard) {
+                        undoButton.focus();
+                    }
+
+                    Logger.log(`Successfully deleted history item ${uid}`);
                 } catch (error) {
                     Logger.error('Failed to delete history item: ' + error.message);
                 }
+            }
+
+            handleUndoDelete(removed) {
+                const { item } = removed;
+                this.messageManager.restoreHistoryItem(removed);
+                this.uiController.setSlipFavourite(item.uid, item.isFavorite);
+                this.updateCounts();
+                this.uiController.refreshHistory();
+                this.uiController.focusHistoryDeleteButton(item.uid);
+                this.uiController.showToast('Fortune restored');
             }
 
             async initialize() {

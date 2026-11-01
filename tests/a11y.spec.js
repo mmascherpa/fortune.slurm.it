@@ -62,12 +62,12 @@ test.describe('automated accessibility check (axe-core)', () => {
         await expectNoViolations(page);
     });
 
-    test('delete confirmation', async ({ page }) => {
+    test('undo message after deleting', async ({ page }) => {
         await crackCookie(page);
         await page.keyboard.press('Escape');
         await openHistory(page);
         await page.locator('.history-delete-btn').click();
-        await expect(page.locator('.confirmation-dialog')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
         await expectNoViolations(page);
     });
 });
@@ -174,14 +174,5 @@ test.describe('history drawer with fortunes', () => {
     test('fortunes are a real list', async ({ page }) => {
         await openHistory(page);
         await expect(page.getByRole('list', { name: /Fortune history/ }).getByRole('listitem')).toHaveCount(2);
-    });
-
-    test('cancelling a delete returns focus to the delete button', async ({ page }) => {
-        await openHistory(page);
-        const deleteButton = page.locator('.history-delete-btn').first();
-        await deleteButton.click();
-        await page.getByRole('button', { name: 'Cancel' }).click();
-        await expect(deleteButton).toBeFocused();
-        await expect(page.locator('#historyPanel')).toHaveAttribute('open');
     });
 });
