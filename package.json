@@ -1,0 +1,13 @@
+{
+  "name": "fortune-slurm-it",
+  "private": true,
+  "description": "Digital Fortune Cookie - static site served from GitHub Pages",
+  "scripts": {
+    "serve": "python3 -m http.server 4173",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.63.0"
+  }
+}
