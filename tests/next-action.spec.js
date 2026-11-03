@@ -6,12 +6,10 @@ test.beforeEach(async ({ page }) => {
     await page.goto('/');
 });
 
-test('a visible hint explains the first step, worded for the device', async ({ page, isMobile }) => {
+test('a visible hint explains the first step, in words that suit any device', async ({ page }) => {
     const hint = page.locator('#cookieHint');
     await expect(hint).toBeVisible();
-    await expect(hint).toHaveText(isMobile
-        ? 'Tap the cookie to reveal your fortune'
-        : 'Click the cookie to reveal your fortune', { useInnerText: true });
+    await expect(hint).toHaveText('Crack the cookie to reveal your fortune');
     await crackCookie(page);
     await expect(hint).toBeHidden();
 });

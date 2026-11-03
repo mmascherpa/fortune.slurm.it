@@ -11,7 +11,8 @@
     <a href="#cookieContainer" class="sr-only focusable">Skip to fortune cookie</a>
 
     <!-- History Toggle Button -->
-    <!-- Accessible name comes from its text: "History 3 fortunes" -->
+    <!-- Accessible name comes from its text: "History 3 fortunes". The word stays visible
+         at every width, so the button is recognisable without guessing the icon. -->
     <button class="history-toggle"
             id="historyToggle"
             type="button"
@@ -110,10 +111,7 @@
 
             <!-- One slot under the cookie: the hint before cracking, the next action after -->
             <div class="next-step">
-                <p class="cookie-hint" id="cookieHint">
-                    <span class="hint-touch">Tap the cookie to reveal your fortune</span>
-                    <span class="hint-mouse">Click the cookie to reveal your fortune</span>
-                </p>
+                <p class="cookie-hint" id="cookieHint">Crack the cookie to reveal your fortune</p>
                 <button class="crack-another-btn" id="crackAnotherBtn" type="button" hidden>
                     Crack another cookie
                 </button>
