@@ -1,5 +1,5 @@
 const AxeBuilder = require('@axe-core/playwright').default;
-const { test, expect, crackCookie, openHistory } = require('./fixtures');
+const { test, expect, crackCookie, openHistory, waitForAnimations } = require('./fixtures');
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
@@ -11,13 +11,20 @@ const KNOWN_VIOLATIONS = {
     historyOpen: ['aria-hidden-focus', 'aria-required-children', 'label-content-name-mismatch', 'nested-interactive']
 };
 
-function expectOnlyKnown(actual, known) {
-    expect(actual.filter(id => !known.includes(id)), 'new accessibility violations').toEqual([]);
+// Failures name the rule and the offending elements, e.g. "target-size: #copyBtn"
+function expectOnlyKnown(violations, known) {
+    const unexpected = violations
+        .filter(v => !known.includes(v.id))
+        .map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(', ')}`);
+    expect(unexpected, 'new accessibility violations').toEqual([]);
 }
 
-async function violationIds(page) {
+async function violations(page) {
+    // Animations must be finished first: mid-transition, buttons are briefly smaller than
+    // they really are and axe reports target-size violations that users never see
+    await waitForAnimations(page);
     const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
-    return results.violations.map(v => v.id).sort();
+    return results.violations;
 }
 
 test.describe('automated accessibility check (axe-core)', () => {
@@ -28,17 +35,17 @@ test.describe('automated accessibility check (axe-core)', () => {
     });
 
     test('opening screen', async ({ page }) => {
-        expectOnlyKnown(await violationIds(page), KNOWN_VIOLATIONS.initial);
+        expectOnlyKnown(await violations(page), KNOWN_VIOLATIONS.initial);
     });
 
     test('fortune revealed', async ({ page }) => {
         await crackCookie(page);
         await expect(page.locator('#fortuneSlip')).toBeVisible();
-        expectOnlyKnown(await violationIds(page), KNOWN_VIOLATIONS.cracked);
+        expectOnlyKnown(await violations(page), KNOWN_VIOLATIONS.cracked);
     });
 
     test('history open', async ({ page }) => {
         await openHistory(page);
-        expectOnlyKnown(await violationIds(page), KNOWN_VIOLATIONS.historyOpen);
+        expectOnlyKnown(await violations(page), KNOWN_VIOLATIONS.historyOpen);
     });
 });
