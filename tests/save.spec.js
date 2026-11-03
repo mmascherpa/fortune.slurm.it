@@ -1,4 +1,4 @@
-const { test, expect, makeHistoryItem, crackCookie, openHistory } = require('./fixtures');
+const { test, expect, makeHistoryItem, crackCookie, openHistory, waitForAnimations } = require('./fixtures');
 
 const saveButton = page => page.getByRole('button', { name: 'Save favourite' });
 const historyButton = page => page.locator('#historyToggle');
@@ -84,20 +84,17 @@ test.describe('History button', () => {
         await crackCookie(page);
         await expect(page.getByRole('button', { name: 'History 1 fortunes' })).toBeVisible();
         await expect(historyButton(page).locator('#historyCount')).toHaveText('1');
-        // The word is visible on wide screens; small screens show the icon with a count badge
-        const label = historyButton(page).locator('.history-toggle-label');
-        if (page.viewportSize().width > 768) {
-            await expect(label).toBeVisible();
-        } else {
-            expect(await label.evaluate(el => el.getBoundingClientRect().width)).toBeLessThanOrEqual(1);
-        }
+        // The word is visible at every width, so the icon never has to be guessed
+        await expect(historyButton(page).locator('.history-toggle-label')).toBeVisible();
     });
 
-    for (const width of [360, 412, 600, 768, 1024]) {
+    for (const width of [320, 360, 412, 600, 768, 1024]) {
         test(`does not overlap the page title at ${width}px wide`, async ({ page }) => {
             await page.setViewportSize({ width, height: 800 });
             await page.goto('/');
             await expect(page.locator('.title')).toBeVisible();
+            // Measure the settled layout: the title fades in from 20px higher
+            await waitForAnimations(page);
             await page.locator('#historyCount').evaluate(el => { el.textContent = '99'; });
             const button = await historyButton(page).boundingBox();
             const badge = await page.locator('.history-count').boundingBox();

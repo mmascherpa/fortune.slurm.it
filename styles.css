@@ -1,17 +1,16 @@
+        /* No vertical centring here: when the content is taller than the screen, a
+           centred flex child overflows upwards and its top can't be scrolled to */
         body {
             margin: 0;
             padding: 0;
             min-height: 100vh;
+            min-height: 100dvh;
             background: linear-gradient(135deg, #dc143c 0%, #8b0000 50%, #b22222 100%);
             font-family: 'Arial', sans-serif;
             overflow-x: hidden;
             overflow-y: auto;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
 
-        /* Full width, so the column's width doesn't depend on how long the title is */
         main {
             width: 100%;
         }
@@ -22,55 +21,100 @@
             position: relative;
             width: 100%;
             max-width: 500px;
-            padding: 20px;
+            /* Bottom padding keeps content clear of the fixed credit link */
+            padding: 20px 20px 64px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
             min-height: 100vh;
+            min-height: 100dvh;
             gap: 30px;
         }
 
+        /* Phones: the History button sits in its own row above the title (see
+           .history-toggle), so the title gets the full width */
         @media (max-width: 768px) {
             .container {
                 gap: 20px;
-                padding: 15px;
+                padding: 66px 16px 64px;
             }
         }
 
         @media (max-height: 600px) {
             .container {
-                gap: 15px;
-                padding: 10px;
+                gap: 14px;
             }
         }
 
         .title {
             color: #ffd700;
-            font-size: 2.5em;
+            /* 1.75rem at 320px, 2.5rem from about 520px up */
+            font-size: clamp(1.75rem, 0.95rem + 4vw, 2.5rem);
             margin: 0;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
             opacity: 0;
             animation: fadeIn 1s ease-in forwards;
             font-weight: 400;
-            letter-spacing: 1.5px;
+            letter-spacing: 1px;
             flex-shrink: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.2;
-        }
-
-        @media (max-width: 768px) {
-            .title {
-                font-size: 2em;
-                padding-left: 50px;
-                padding-right: 50px;
-            }
+            line-height: 1.15;
+            text-wrap: balance;
         }
 
         @media (max-height: 600px) {
             .title {
-                font-size: 1.8em;
+                font-size: clamp(1.5rem, 1rem + 2.5vw, 1.9rem);
+            }
+        }
+
+        /* Short landscape screens (phones on their side): title across the top, the
+           cookie or fortune on the left, the next action beside it */
+        @media (orientation: landscape) and (max-height: 500px) {
+            .container {
+                max-width: 820px;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                grid-template-areas:
+                    "title title"
+                    "stage next";
+                align-items: center;
+                align-content: start;
+                column-gap: 24px;
+                row-gap: 12px;
+                padding: 12px 24px 56px;
+            }
+
+            /* Title on the left like an app bar, clear of the History button on the right */
+            .title {
+                grid-area: title;
+                justify-self: start;
+                text-align: left;
+                padding-right: 170px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+            }
+
+            body .history-toggle {
+                top: 12px;
+                right: 16px;
+            }
+
+            .container .cookie-stage {
+                grid-area: stage;
+                justify-self: center;
+                min-height: 0;
+            }
+
+            .container .next-step {
+                grid-area: next;
+            }
+
+            .cookie-hint {
+                max-width: 12em;
             }
         }
 
@@ -242,13 +286,14 @@
             border: 1px solid rgba(255, 215, 0, 0.3);
             color: #ffd700;
             cursor: pointer;
-            padding: 6px 10px;
-            border-radius: 4px;
+            padding: 0;
+            border-radius: 8px;
             transition: all 0.2s ease;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 32px;
+            min-width: 44px;
+            min-height: 44px;
         }
 
         .history-btn svg {
@@ -307,7 +352,11 @@
 
         @media (max-width: 400px) {
             .fortune-slip {
-                padding: 24px 16px 14px;
+                padding: 24px 14px 14px;
+            }
+
+            .fortune-slip .slip-action {
+                padding: 0 13px;
             }
         }
 
@@ -431,8 +480,8 @@
             color: #6b0000;
             border: 0;
             border-radius: 999px;
-            min-height: 32px;
-            padding: 4px 14px;
+            min-height: 44px;
+            padding: 4px 16px;
             font: inherit;
             font-weight: bold;
             cursor: pointer;
@@ -465,21 +514,6 @@
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
             opacity: 0;
             animation: fadeIn 1s ease-in 1.2s forwards;
-        }
-
-        /* Say "Click" on devices with a mouse or trackpad, "Tap" otherwise */
-        .hint-mouse {
-            display: none;
-        }
-
-        @media (hover: hover) and (pointer: fine) {
-            .hint-touch {
-                display: none;
-            }
-
-            .hint-mouse {
-                display: inline;
-            }
         }
 
         .crack-another-btn {
@@ -536,6 +570,13 @@
             transition: all 0.3s ease;
         }
 
+        /* Invisible extension of the tappable area to 44px tall */
+        .api-credit::after {
+            content: '';
+            position: absolute;
+            inset: -9px 0;
+        }
+
         .api-credit:hover {
             color: #ffd700;
             background: rgba(139, 0, 0, 0.5);
@@ -590,27 +631,18 @@
             justify-content: center;
         }
 
-        /* Small screens: the title leaves room for a round button only, so show the icon
-           with the count as a corner badge. The word stays for screen readers. */
+        /* Phones: the button keeps its word and sits in a row of its own above the title
+           (the container's top padding). It scrolls with the page rather than floating
+           over the content. */
         @media (max-width: 768px) {
-            .history-toggle-label {
+            .history-toggle {
                 position: absolute;
-                width: 1px;
-                height: 1px;
-                overflow: hidden;
-                clip: rect(0, 0, 0, 0);
-                white-space: nowrap;
-            }
-
-            .history-count {
-                position: absolute;
-                top: -6px;
-                right: -6px;
-                min-width: 20px;
-                height: 20px;
-                padding: 0 5px;
-                font-size: 0.7em;
-                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+                top: 11px;
+                right: 16px;
+                height: 44px;
+                padding: 0 10px 0 12px;
+                gap: 6px;
+                font-size: 0.95em;
             }
         }
 
@@ -692,9 +724,11 @@
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 215, 0, 0.2);
             color: #fffef7;
+            min-height: 44px;
             padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 0.9em;
+            border-radius: 8px;
+            /* 16px or more stops iOS Safari zooming the page when the field is focused */
+            font-size: 1rem;
             transition: all 0.2s ease;
             box-sizing: border-box;
         }
@@ -731,10 +765,11 @@
             border: 1px solid rgba(255, 215, 0, 0.3);
             color: rgba(255, 215, 0, 0.7);
             cursor: pointer;
-            padding: 6px 12px;
-            border-radius: 4px;
+            min-height: 44px;
+            padding: 0 14px;
+            border-radius: 8px;
             transition: all 0.2s ease;
-            font-size: 0.85em;
+            font-size: 0.9em;
             letter-spacing: 0.5px;
         }
 
@@ -775,8 +810,9 @@
             border: none;
             color: #ffd700;
             cursor: pointer;
-            width: 28px;
-            height: 28px;
+            width: 44px;
+            height: 44px;
+            margin-right: -8px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -895,14 +931,6 @@
         @media (max-width: 768px) {
             .history-panel {
                 width: 100%;
-            }
-
-            .history-toggle {
-                top: 10px;
-                right: 10px;
-                width: 44px;
-                height: 44px;
-                padding: 0;
             }
         }
 
