@@ -58,3 +58,16 @@ test.describe('without the advice API', () => {
         await expect(page.locator('#status-indicator')).toHaveAttribute('aria-label', /Connection issues|Offline/);
     });
 });
+
+test('every file the page references is served', async ({ page, request }) => {
+    await page.goto('/');
+    const urls = await page.evaluate(() => Array.from(
+        document.querySelectorAll('link[href], script[src], img[src]'),
+        el => new URL(el.getAttribute('href') || el.getAttribute('src'), location.href)
+    ).filter(url => url.origin === location.origin).map(url => url.pathname));
+    expect(urls.length).toBeGreaterThan(0);
+    for (const path of urls) {
+        const response = await request.get(path);
+        expect(response.status(), `${path} should be published`).toBe(200);
+    }
+});
