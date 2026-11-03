@@ -20,7 +20,7 @@
             MAX_KNOWN_IDS: 1000,
             AUTO_SAVE_INTERVAL: 30000,
             TIMEOUTS: {
-                CLOSE_BUTTON_FOCUS_DELAY: 900,
+                RECRACK_DELAY: 450, // lets the old slip fold away before the next cookie cracks
                 REFILL_SCHEDULE_DELAY: 100,
                 INITIAL_ANIMATION_DURATION: 1500,
                 PARTICLE_CLEANUP: 5000,
@@ -603,7 +603,8 @@
                     fortuneText: document.getElementById('fortuneText'),
                     luckyNumbers: document.getElementById('luckyNumbers'),
                     copyBtn: document.getElementById('copyBtn'),
-                    closeBtn: document.getElementById('closeBtn'),
+                    cookieHint: document.getElementById('cookieHint'),
+                    crackAnotherBtn: document.getElementById('crackAnotherBtn'),
                     historyToggle: document.getElementById('historyToggle'),
                     historyPanel: document.getElementById('historyPanel'),
                     historyClose: document.getElementById('historyClose'),
@@ -633,11 +634,7 @@
                     { stopPropagation: true }
                 );
 
-                this.addAccessibleClickHandler(
-                    this.elements.closeBtn,
-                    () => this.resetCookie(),
-                    { stopPropagation: true }
-                );
+                this.elements.crackAnotherBtn.addEventListener('click', () => this.crackAnother());
 
                 this.addAccessibleClickHandler(
                     this.elements.historyToggle,
@@ -869,22 +866,38 @@
 
                 this.elements.fortuneAnnouncer.textContent = `Your fortune: ${message} Lucky numbers: ${numbers.join(', ')}.`;
 
-                // Move focus to the slip once it has appeared, so keyboard users land on its actions
-                clearTimeout(this.slipFocusTimer);
-                this.slipFocusTimer = setTimeout(() => {
-                    this.elements.closeBtn.focus();
-                }, CONFIG.TIMEOUTS.CLOSE_BUTTON_FOCUS_DELAY);
+                // Swap the hint for the next action, and move focus there: the cookie button
+                // just became inert, so focus would otherwise fall back to the page
+                this.elements.cookieHint.hidden = true;
+                this.elements.crackAnotherBtn.hidden = false;
+                this.elements.crackAnotherBtn.focus();
+            }
+
+            // Fold the current slip away and crack a fresh cookie in one step
+            crackAnother() {
+                if (!this.isCracked || this.recrackTimer) return;
+
+                this.elements.cookieStage.classList.remove('cracked');
+                this.elements.fortuneSlip.inert = true;
+
+                this.recrackTimer = setTimeout(() => {
+                    this.recrackTimer = null;
+                    this.onCookieClick();
+                }, CONFIG.TIMEOUTS.RECRACK_DELAY);
             }
 
             resetCookie() {
                 this.isCracked = false;
-                clearTimeout(this.slipFocusTimer);
+                clearTimeout(this.recrackTimer);
+                this.recrackTimer = null;
                 this.elements.cookieStage.classList.remove('cracked');
                 this.elements.cookie.classList.add('visible');
 
                 this.elements.fortuneSlip.inert = true;
                 this.elements.cookieContainer.inert = false;
                 this.elements.fortuneAnnouncer.textContent = '';
+                this.elements.crackAnotherBtn.hidden = true;
+                this.elements.cookieHint.hidden = false;
 
                 // Return focus to the cookie for keyboard users
                 this.elements.cookieContainer.focus();

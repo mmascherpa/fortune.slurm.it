@@ -261,13 +261,8 @@
             height: 18px;
         }
 
-        .close-btn {
-            right: -12px;
-            opacity: 1;
-        }
-
         .copy-btn {
-            right: 24px;
+            right: -12px;
         }
 
         .copy-btn.copied {
@@ -485,6 +480,73 @@
         .toast-action:focus-visible {
             outline: 2px solid #fffef7;
             outline-offset: 2px;
+        }
+
+        /* Slot under the cookie: hint before cracking, "Crack another cookie" after.
+           Fixed height so swapping them doesn't shift the page. */
+        .next-step {
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .cookie-hint {
+            margin: 0;
+            color: rgba(255, 237, 160, 0.95);
+            font-size: 1.05em;
+            letter-spacing: 0.5px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            animation: fadeIn 1s ease-in 1.2s forwards;
+        }
+
+        /* Say "Click" on devices with a mouse or trackpad, "Tap" otherwise */
+        .hint-mouse {
+            display: none;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .hint-touch {
+                display: none;
+            }
+
+            .hint-mouse {
+                display: inline;
+            }
+        }
+
+        .crack-another-btn {
+            min-height: 48px;
+            padding: 12px 28px;
+            border-radius: 999px;
+            border: 2px solid #b8860b;
+            background: linear-gradient(45deg, #ffd700 0%, #ffed4e 50%, #ffc107 100%);
+            color: #6b0000;
+            font: inherit;
+            font-size: 1.05em;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .crack-another-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4), 0 0 12px rgba(255, 215, 0, 0.5);
+        }
+
+        .crack-another-btn:focus-visible {
+            outline: 3px solid #fffef7;
+            outline-offset: 3px;
+        }
+
+        .crack-another-btn[hidden],
+        .cookie-hint[hidden] {
+            display: none;
         }
 
         .cracked .fortune-slip {
