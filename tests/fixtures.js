@@ -50,11 +50,16 @@ async function crackCookie(page) {
     await base.expect(page.locator('#fortuneText')).not.toBeEmpty();
 }
 
-// Press "Crack another cookie" and wait until a different fortune is showing
+const crackedCount = page => page.evaluate(() => fortuneApp.messageManager.getFortuneCount());
+
+// Press "Crack another cookie" and wait until the next fortune is showing. Waits on the
+// cracked-cookies count, not on the text changing: when the queue runs dry the app serves
+// random fallback messages, and the same one can come up twice in a row.
 async function crackAnother(page) {
-    const previous = await page.locator('#fortuneText').textContent();
+    const before = await crackedCount(page);
     await page.locator('#crackAnotherBtn').click();
-    await base.expect(page.locator('#fortuneText')).not.toHaveText(previous);
+    await base.expect.poll(() => crackedCount(page)).toBe(before + 1);
+    await base.expect(page.locator('#cookieStage')).toHaveClass(/cracked/);
 }
 
 // Wait for running CSS animations and transitions to finish, so checks see the settled

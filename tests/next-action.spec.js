@@ -36,9 +36,9 @@ test('one press reveals a new fortune and records it', async ({ page }) => {
 test('repeated Enter keeps cracking cookies without leaving the button', async ({ page }) => {
     await crackCookie(page);
     for (let i = 0; i < 3; i++) {
-        const previous = await page.locator('#fortuneText').textContent();
         await page.keyboard.press('Enter');
-        await expect(page.locator('#fortuneText')).not.toHaveText(previous);
+        // Wait on the count: two consecutive fortunes can have the same text
+        await expect.poll(() => historyCount(page)).toBe(i + 2);
         await expect(page.locator('#crackAnotherBtn')).toBeFocused();
     }
     expect(await historyCount(page)).toBe(4);
