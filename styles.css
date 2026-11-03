@@ -339,112 +339,6 @@
             }
         }
 
-        /* Confirmation Dialog Styles (native modal <dialog>, centred by the browser) */
-        .confirmation-dialog {
-            background: linear-gradient(135deg, rgba(139, 0, 0, 0.98) 0%, rgba(178, 34, 34, 0.98) 100%);
-            color: inherit;
-            border: 2px solid rgba(255, 215, 0, 0.5);
-            border-radius: 15px;
-            padding: 25px;
-            max-width: 400px;
-            width: 90%;
-            box-sizing: border-box;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            transform: scale(0.9);
-            animation: popIn 0.3s ease forwards;
-        }
-
-        .confirmation-dialog::backdrop {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(3px);
-        }
-
-        @keyframes popIn {
-            to {
-                transform: scale(1);
-            }
-        }
-
-        .confirmation-title {
-            color: #ffd700;
-            font-size: 1.3em;
-            margin: 0 0 15px 0;
-            font-weight: 300;
-            letter-spacing: 1px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        .confirmation-message {
-            color: #fffef7;
-            font-size: 1em;
-            line-height: 1.5;
-            margin-bottom: 15px;
-        }
-
-        .confirmation-fortune-preview {
-            color: #ffd700;
-            font-size: 0.95em;
-            font-style: italic;
-            line-height: 1.4;
-            margin-bottom: 20px;
-            padding: 12px;
-            background: rgba(0, 0, 0, 0.2);
-            border-left: 3px solid rgba(255, 215, 0, 0.5);
-            border-radius: 4px;
-        }
-
-        .confirmation-buttons {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-        }
-
-        .confirmation-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: 2px solid;
-            cursor: pointer;
-            font-size: 1em;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            min-width: 80px;
-        }
-
-        .confirmation-btn-cancel {
-            background: transparent;
-            border-color: rgba(255, 215, 0, 0.4);
-            color: #ffd700;
-        }
-
-        .confirmation-btn-cancel:hover {
-            background: rgba(255, 215, 0, 0.1);
-            border-color: rgba(255, 215, 0, 0.6);
-            transform: translateY(-1px);
-        }
-
-        .confirmation-btn-cancel:focus {
-            outline: 2px solid #ffd700;
-            outline-offset: 2px;
-        }
-
-        .confirmation-btn-confirm {
-            background: #dc143c;
-            border-color: #dc143c;
-            color: #fffef7;
-        }
-
-        .confirmation-btn-confirm:hover {
-            background: #b22222;
-            border-color: #b22222;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(220, 20, 60, 0.4);
-        }
-
-        .confirmation-btn-confirm:focus {
-            outline: 2px solid #ffd700;
-            outline-offset: 2px;
-        }
-
         @media (max-width: 768px) {
             .fortune-slip {
                 padding: 10px;
@@ -484,6 +378,108 @@
             box-shadow: 0 8px 20px rgba(0,0,0,0.4), inset 0 2px 10px rgba(255,255,255,0.3), 0 0 20px rgba(255, 215, 0, 0.4);
             opacity: 0;
             transition: opacity 0.3s ease 0.5s;
+        }
+
+        .fortune-slip-actions {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .save-favourite-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 36px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 2px solid #8b0000;
+            background: transparent;
+            color: #8b0000;
+            font: inherit;
+            font-size: 0.9em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .save-icon svg {
+            display: block;
+        }
+
+        .save-favourite-btn:hover {
+            background: rgba(139, 0, 0, 0.08);
+        }
+
+        .save-favourite-btn:focus-visible {
+            outline: 2px solid #dc143c;
+            outline-offset: 2px;
+        }
+
+        .save-favourite-btn.saved {
+            background: #8b0000;
+            color: #ffd700;
+            animation: savePop 0.3s ease;
+        }
+
+        @keyframes savePop {
+            50% { transform: scale(1.08); }
+        }
+
+        /* Brief confirmation messages */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 64px;
+            transform: translate(-50%, 12px);
+            width: max-content;
+            max-width: calc(100% - 32px);
+            box-sizing: border-box;
+            padding: 10px 18px;
+            border-radius: 999px;
+            background: rgba(40, 0, 0, 0.92);
+            border: 1px solid rgba(255, 215, 0, 0.6);
+            color: #ffd700;
+            font-size: 0.95em;
+            text-align: center;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 1001;
+        }
+
+        .toast.visible {
+            opacity: 1;
+            transform: translate(-50%, 0);
+            pointer-events: auto;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .toast-action {
+            background: #ffd700;
+            color: #6b0000;
+            border: 0;
+            border-radius: 999px;
+            min-height: 32px;
+            padding: 4px 14px;
+            font: inherit;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .toast-action:hover {
+            background: #ffed4e;
+        }
+
+        .toast-action:focus-visible {
+            outline: 2px solid #fffef7;
+            outline-offset: 2px;
         }
 
         /* Slot under the cookie: hint before cracking, "Crack another cookie" after.
@@ -591,13 +587,17 @@
             background: rgba(139, 0, 0, 0.3);
             border: 2px solid rgba(255, 215, 0, 0.4);
             color: #ffd700;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
+            height: 46px;
+            padding: 0 12px 0 14px;
+            border-radius: 999px;
+            font: inherit;
+            font-size: 1em;
+            letter-spacing: 0.5px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 8px;
             transition: all 0.3s ease;
             backdrop-filter: blur(5px);
             z-index: 999;
@@ -605,8 +605,48 @@
 
         .history-toggle svg {
             display: block;
-            width: 24px;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .history-count {
+            min-width: 24px;
             height: 24px;
+            padding: 0 6px;
+            box-sizing: border-box;
+            border-radius: 999px;
+            background: #ffd700;
+            color: #6b0000;
+            font-size: 0.8em;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Small screens: the title leaves room for a round button only, so show the icon
+           with the count as a corner badge. The word stays for screen readers. */
+        @media (max-width: 768px) {
+            .history-toggle-label {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+            }
+
+            .history-count {
+                position: absolute;
+                top: -6px;
+                right: -6px;
+                min-width: 20px;
+                height: 20px;
+                padding: 0 5px;
+                font-size: 0.7em;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+            }
         }
 
         .history-toggle:hover {
@@ -815,13 +855,13 @@
         }
 
         .fortune-counter {
-            font-size: 0.65em;
+            margin: 4px 0 0;
+            font-size: 0.85em;
             color: rgba(255, 215, 0, 0.7);
             font-weight: 400;
             letter-spacing: 1px;
-            margin-left: 8px;
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: inline-block;
+            transform-origin: left center;
         }
 
         .fortune-counter.counter-bump {
@@ -959,8 +999,9 @@
             .history-toggle {
                 top: 10px;
                 right: 10px;
-                width: 45px;
-                height: 45px;
+                width: 44px;
+                height: 44px;
+                padding: 0;
             }
         }
 

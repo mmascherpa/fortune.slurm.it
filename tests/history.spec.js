@@ -40,9 +40,7 @@ test.describe('history panel', () => {
     test('deleting with the favourites filter on removes the chosen card', async ({ page }) => {
         await page.locator('#filterToggle').click();
         await page.locator('.history-delete-btn').nth(2).click();
-        await page.locator('.confirmation-btn-confirm').click();
         await expect(historyTexts(page)).toHaveText(['Fortune 25', 'Fortune 26', 'Fortune 28', 'Fortune 29']);
-        await expect(page.locator('#historySearch')).toBeFocused();
     });
 
     test('deleting with a search active removes the chosen card', async ({ page }) => {
@@ -50,19 +48,7 @@ test.describe('history panel', () => {
         const last = historyTexts(page).last();
         const target = await last.textContent();
         await page.locator('.history-delete-btn').last().click();
-        await page.locator('.confirmation-btn-confirm').click();
         await expect(historyTexts(page).filter({ hasText: new RegExp(`^${target}$`) })).toHaveCount(0);
-    });
-
-    test('Escape in the delete dialog closes only the dialog', async ({ page }) => {
-        const deleteButton = page.locator('.history-delete-btn').first();
-        await deleteButton.click();
-        // Focus starts on Cancel, the safe choice
-        await expect(page.locator('.confirmation-btn-cancel')).toBeFocused();
-        await page.keyboard.press('Escape');
-        await expect(page.locator('.confirmation-dialog')).toHaveCount(0);
-        await expect(page.locator('#historyPanel')).toHaveAttribute('open');
-        await expect(deleteButton).toBeFocused();
     });
 
     test('first Escape clears the search, second closes the panel', async ({ page }) => {
