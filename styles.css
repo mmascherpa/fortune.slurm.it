@@ -11,7 +11,13 @@
             align-items: center;
         }
 
+        /* Full width, so the column's width doesn't depend on how long the title is */
+        main {
+            width: 100%;
+        }
+
         .container {
+            margin-inline: auto;
             text-align: center;
             position: relative;
             width: 100%;
@@ -44,7 +50,7 @@
             color: #ffd700;
             font-size: 2.5em;
             margin: 0;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.6), 0 0 8px rgba(255, 215, 0, 0.25);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
             opacity: 0;
             animation: fadeIn 1s ease-in forwards;
             font-weight: 400;
@@ -68,17 +74,22 @@
             }
         }
 
-        /* Holds the cookie button and the fortune slip side by side in the DOM,
-           stacked on screen: the slip is positioned over the cookie */
+        /* Holds the cookie button and the fortune slip side by side in the DOM, stacked
+           on screen in the same grid cell. The slip stays in the layout flow, so a long
+           fortune makes the stage taller instead of spilling over what comes below. */
         .cookie-stage {
             position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            place-items: center;
             width: 100%;
             min-height: 300px;
             max-width: 400px;
             flex-shrink: 0;
+        }
+
+        .cookie-stage > * {
+            grid-area: 1 / 1;
         }
 
         .cookie-container {
@@ -165,19 +176,23 @@
             filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
         }
 
+        /* The revealed fortune: the message is the largest, darkest thing on it;
+           lucky numbers are a quiet footnote; actions sit together at the bottom */
         .fortune-slip {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(0);
-            background: linear-gradient(145deg, #fffef7 0%, #faf8f1 100%);
-            padding: 12px;
-            border-radius: 10px;
-            border: 2px solid #ffd700;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.4), 0 0 20px rgba(255, 215, 0, 0.2);
-            width: 90%;
-            max-width: 350px;
-            min-width: 240px;
+            --slip-ink: #4a1010;
+            --slip-muted: #7a4b3a;
+            --slip-accent: #8b0000;
+            --slip-paper: #fffdf6;
+
+            position: relative;
+            transform: scale(0);
+            background: var(--slip-paper);
+            color: var(--slip-ink);
+            padding: 28px 24px 18px;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+            width: 100%;
+            max-width: 380px;
             opacity: 0;
             transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 10;
@@ -185,89 +200,40 @@
             pointer-events: none;
         }
 
-        .fortune-slip blockquote {
+        .fortune-quote {
             margin: 0;
             padding: 0;
         }
 
         .fortune-text {
-            color: #8b0000;
-            font-size: 1em;
-            line-height: 1.4;
-            font-style: italic;
-            margin-bottom: 5px;
-            font-weight: 500;
-            word-wrap: break-word;
+            margin: 0;
+            color: var(--slip-ink);
+            font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Noto Serif', serif;
+            font-size: clamp(1.2rem, 1.05rem + 0.6vw, 1.4rem);
+            font-style: normal;
+            font-weight: 400;
+            line-height: 1.45;
+            text-wrap: pretty;
+            overflow-wrap: break-word;
             hyphens: none;
         }
 
         .lucky-numbers {
-            margin-top: 12px;
+            margin: 18px 0 0;
             padding-top: 12px;
-            border-top: 1px solid #ffd700;
+            border-top: 1px solid rgba(139, 0, 0, 0.15);
+            color: var(--slip-muted);
+            font-size: 0.85rem;
+            line-height: 1.4;
         }
 
         .lucky-numbers-label {
-            color: #8b0000;
-            font-size: 0.9em;
-            font-weight: bold;
-            margin: 0 0 6px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            margin-right: 0.35em;
         }
 
         .lucky-numbers-text {
-            color: #dc143c;
-            font-size: 1.1em;
-            font-weight: bold;
-            margin: 0;
-            letter-spacing: 2px;
-        }
-
-        /* Base styles for fortune slip buttons */
-        .fortune-slip-btn {
-            position: absolute;
-            top: -12px;
-            background: #8b0000;
-            border: 2px solid #ffd700;
-            color: #fffef7;
-            line-height: 1;
-            cursor: pointer;
-            padding: 0;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        .fortune-slip-btn:hover {
-            background: #dc143c;
-            transform: scale(1.1);
-        }
-
-        .fortune-slip-btn:focus {
-            background: #dc143c;
-            outline: 2px solid #ffd700;
-            outline-offset: 2px;
-        }
-
-        .fortune-slip-btn svg {
-            display: block;
-            width: 18px;
-            height: 18px;
-        }
-
-        .copy-btn {
-            right: -12px;
-        }
-
-        .copy-btn.copied {
-            background: #228b22;
-            border-color: #90ee90;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.5px;
         }
 
         /* Base styles for history action buttons */
@@ -339,37 +305,25 @@
             }
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 400px) {
             .fortune-slip {
-                padding: 10px;
-                max-width: 300px;
-            }
-
-            .fortune-text {
-                font-size: 0.95em;
-                line-height: 1.3;
-                margin-bottom: 4px;
-            }
-
-            .fortune-signature {
-                font-size: 0.8em;
+                padding: 24px 16px 14px;
             }
         }
 
         @media (max-height: 600px) {
             .fortune-slip {
-                padding: 8px;
-                max-width: 280px;
+                padding: 18px 18px 12px;
             }
 
             .fortune-text {
-                font-size: 0.9em;
-                line-height: 1.2;
-                margin-bottom: 3px;
+                font-size: 1.1rem;
+                line-height: 1.4;
             }
 
-            .fortune-signature {
-                font-size: 0.75em;
+            .lucky-numbers {
+                margin-top: 12px;
+                padding-top: 8px;
             }
         }
 
@@ -382,42 +336,53 @@
 
         .fortune-slip-actions {
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 14px;
         }
 
-        .save-favourite-btn {
+        /* Copy and Save share one style; 44px tall for comfortable tapping */
+        .slip-action {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
-            min-height: 36px;
-            padding: 6px 14px;
+            min-height: 44px;
+            padding: 0 16px;
             border-radius: 999px;
-            border: 2px solid #8b0000;
+            border: 1.5px solid rgba(139, 0, 0, 0.35);
             background: transparent;
-            color: #8b0000;
+            color: var(--slip-accent);
             font: inherit;
-            font-size: 0.9em;
+            font-size: 0.95rem;
             font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
         }
 
-        .save-icon svg {
+        .slip-action-icon svg {
             display: block;
         }
 
-        .save-favourite-btn:hover {
-            background: rgba(139, 0, 0, 0.08);
+        .slip-action:hover {
+            background: rgba(139, 0, 0, 0.06);
+            border-color: var(--slip-accent);
         }
 
-        .save-favourite-btn:focus-visible {
-            outline: 2px solid #dc143c;
+        .slip-action:focus-visible {
+            outline: 2px solid var(--slip-accent);
             outline-offset: 2px;
         }
 
+        .slip-action.copied {
+            border-color: #1f6b2a;
+            color: #1f6b2a;
+        }
+
         .save-favourite-btn.saved {
-            background: #8b0000;
+            background: var(--slip-accent);
+            border-color: var(--slip-accent);
             color: #ffd700;
             animation: savePop 0.3s ease;
         }
@@ -550,7 +515,7 @@
         }
 
         .cracked .fortune-slip {
-            transform: translate(-50%, -50%) scale(1);
+            transform: scale(1);
             opacity: 1;
             pointer-events: auto;
             transition-delay: 0.8s;
