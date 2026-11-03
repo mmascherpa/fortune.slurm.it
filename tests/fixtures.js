@@ -69,7 +69,7 @@ async function waitForAnimations(page) {
 
 async function openHistory(page) {
     await page.locator('#historyToggle').click();
-    await base.expect(page.locator('#historyPanel')).toHaveClass(/open/);
+    await base.expect(page.locator('#historyPanel')).toHaveAttribute('open');
 }
 
 module.exports = { test, expect: base.expect, makeHistoryItem, crackCookie, closeFortune, openHistory, waitForAnimations };

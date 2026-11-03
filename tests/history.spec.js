@@ -20,7 +20,7 @@ test.describe('history panel', () => {
     });
 
     test('favourites survive new fortunes pushing out old ones', async ({ page }) => {
-        await page.keyboard.press('Escape'); // empty search: closes the panel
+        await page.locator('#historyClose').click();
         for (let i = 0; i < 22; i++) {
             await crackCookie(page);
             await closeFortune(page);
@@ -57,10 +57,11 @@ test.describe('history panel', () => {
     test('Escape in the delete dialog closes only the dialog', async ({ page }) => {
         const deleteButton = page.locator('.history-delete-btn').first();
         await deleteButton.click();
-        await expect(page.locator('.confirmation-btn-confirm')).toBeFocused();
+        // Focus starts on Cancel, the safe choice
+        await expect(page.locator('.confirmation-btn-cancel')).toBeFocused();
         await page.keyboard.press('Escape');
-        await expect(page.locator('.confirmation-overlay')).toHaveCount(0);
-        await expect(page.locator('#historyPanel')).toHaveClass(/open/);
+        await expect(page.locator('.confirmation-dialog')).toHaveCount(0);
+        await expect(page.locator('#historyPanel')).toHaveAttribute('open');
         await expect(deleteButton).toBeFocused();
     });
 
@@ -68,9 +69,9 @@ test.describe('history panel', () => {
         await page.locator('#historySearch').fill('Fortune');
         await page.keyboard.press('Escape');
         await expect(page.locator('#historySearch')).toHaveValue('');
-        await expect(page.locator('#historyPanel')).toHaveClass(/open/);
+        await expect(page.locator('#historyPanel')).toHaveAttribute('open');
         await page.keyboard.press('Escape');
-        await expect(page.locator('#historyPanel')).not.toHaveClass(/open/);
+        await expect(page.locator('#historyPanel')).not.toHaveAttribute('open');
     });
 });
 
