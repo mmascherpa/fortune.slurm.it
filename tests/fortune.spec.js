@@ -1,4 +1,4 @@
-const { test, expect, crackCookie, crackAnother, openHistory } = require('./fixtures');
+const { test, expect, crackCookie, crackAnother, openHistory, waitForAnimations } = require('./fixtures');
 
 test.describe('cracking a cookie', () => {
     test.beforeEach(async ({ page }) => {
@@ -38,6 +38,57 @@ test.describe('cracking a cookie', () => {
         await page.reload();
         await openHistory(page);
         await expect(page.locator('.history-fortune-text').first()).toHaveText(text);
+    });
+});
+
+test.describe('the fortune slip', () => {
+    const LONG_FORTUNE = 'Remember that spiders are more afraid of you than you are of them, and that the best '
+        + 'way to deal with fear is to understand it, face it calmly, and then go and make yourself a '
+        + 'really good cup of tea.';
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/');
+        await crackCookie(page);
+        await waitForAnimations(page);
+    });
+
+    test('the message is the most prominent text, the lucky numbers are quieter', async ({ page }) => {
+        const style = selector => page.locator(selector).evaluate(el => {
+            const s = getComputedStyle(el);
+            return { size: parseFloat(s.fontSize), weight: Number(s.fontWeight), italic: s.fontStyle === 'italic' };
+        });
+        const message = await style('#fortuneText');
+        const numbers = await style('#luckyNumbers');
+        expect(message.italic).toBe(false);
+        expect(message.size).toBeGreaterThanOrEqual(17);
+        expect(numbers.size).toBeLessThan(message.size);
+        expect(numbers.weight).toBeLessThanOrEqual(message.weight);
+    });
+
+    test('Copy and Save sit together on the slip and are at least 44px tall', async ({ page }) => {
+        const copy = await page.getByRole('button', { name: 'Copy', exact: true }).boundingBox();
+        const save = await page.getByRole('button', { name: 'Save favourite' }).boundingBox();
+        const slip = await page.locator('#fortuneSlip').boundingBox();
+        for (const box of [copy, save]) {
+            expect(box.height).toBeGreaterThanOrEqual(44);
+            expect(box.y).toBeGreaterThanOrEqual(slip.y);
+            expect(box.y + box.height).toBeLessThanOrEqual(slip.y + slip.height);
+        }
+    });
+
+    test('Copy confirms on the button, then returns to its label', async ({ page }) => {
+        const copy = page.locator('#copyBtn');
+        await copy.click();
+        await expect(copy).toHaveText('Copied');
+        await copy.click();
+        await expect(copy).toHaveText('Copy', { timeout: 4000 });
+    });
+
+    test('a long fortune grows the slip instead of covering the next button', async ({ page }) => {
+        await page.locator('#fortuneText').evaluate((el, text) => { el.textContent = text; }, LONG_FORTUNE);
+        const slip = await page.locator('#fortuneSlip').boundingBox();
+        const next = await page.locator('#crackAnotherBtn').boundingBox();
+        expect(slip.y + slip.height).toBeLessThanOrEqual(next.y);
     });
 });
 

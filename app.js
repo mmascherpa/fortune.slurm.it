@@ -955,21 +955,38 @@
                 }
             }
 
+            // Swap the icon for a check (and a visible label, if the button has one, for
+            // "Copied") for two seconds. Pressing again restarts the timer rather than
+            // capturing the check as the "original" state.
             showCopyFeedback(button) {
-                const originalContent = button.innerHTML;
-                const originalLabel = button.getAttribute('aria-label');
-                const originalTitle = button.getAttribute('title');
+                const iconSlot = button.querySelector('.slip-action-icon') || button;
+                const label = button.querySelector('.slip-action-label');
+
+                if (!button._copyFeedback) {
+                    button._copyFeedback = {
+                        icon: iconSlot.innerHTML,
+                        text: label ? label.textContent : null,
+                        ariaLabel: button.getAttribute('aria-label'),
+                        title: button.getAttribute('title'),
+                        timer: null
+                    };
+                }
+                const saved = button._copyFeedback;
+                clearTimeout(saved.timer);
 
                 button.classList.add('copied');
-                button.innerHTML = this.createIcon('check', 16);
-                button.setAttribute('aria-label', 'Copied to clipboard!');
-                button.setAttribute('title', 'Copied to clipboard!');
+                iconSlot.innerHTML = this.createIcon('check', 16);
+                if (label) label.textContent = 'Copied';
+                if (saved.ariaLabel !== null) button.setAttribute('aria-label', 'Copied to clipboard!');
+                if (saved.title !== null) button.setAttribute('title', 'Copied to clipboard!');
 
-                setTimeout(() => {
+                saved.timer = setTimeout(() => {
                     button.classList.remove('copied');
-                    button.innerHTML = originalContent;
-                    button.setAttribute('aria-label', originalLabel);
-                    button.setAttribute('title', originalTitle);
+                    iconSlot.innerHTML = saved.icon;
+                    if (label) label.textContent = saved.text;
+                    if (saved.ariaLabel !== null) button.setAttribute('aria-label', saved.ariaLabel);
+                    if (saved.title !== null) button.setAttribute('title', saved.title);
+                    button._copyFeedback = null;
                 }, 2000);
             }
 

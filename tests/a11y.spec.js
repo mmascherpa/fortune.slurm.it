@@ -96,8 +96,9 @@ test.describe('fortune cookie semantics', () => {
     test('the hidden slip is not reachable before cracking', async ({ page }) => {
         const stops = await tabStops(page, 6);
         expect(stops).not.toContain('copyBtn');
+        expect(stops).not.toContain('saveFavouriteBtn');
         expect(stops).not.toContain('crackAnotherBtn');
-        expect(await accessibleNames(page)).not.toContain('Copy fortune');
+        expect(await accessibleNames(page)).not.toContain('Save favourite');
     });
 
     test('revealing a fortune announces it and moves focus to the slip', async ({ page }) => {
