@@ -23,7 +23,9 @@
                 RECRACK_DELAY: 450, // lets the old slip fold away before the next cookie cracks
                 REFILL_SCHEDULE_DELAY: 100,
                 INITIAL_ANIMATION_DURATION: 1500,
-                PARTICLE_CLEANUP: 5000
+                PARTICLE_CLEANUP: 5000,
+                TOAST_DURATION: 2500,
+                UNDO_DURATION: 5000
             },
             STATUS_STYLES: {
                 success: {
@@ -103,6 +105,14 @@
                 numbers.add(Math.floor(Math.random() * max) + 1);
             }
             return Array.from(numbers).sort((a, b) => a - b);
+        }
+
+        // Permanent identifier for a history entry; positions change as entries are added or deleted
+        function createUid() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+            return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
         }
 
         // Keep every favorite plus the newest `limit` non-favorites, preserving order
@@ -347,7 +357,9 @@
                     this.fortuneHistory = savedHistory.map(item => ({
                         ...item,
                         isFavorite: item.isFavorite || false,
-                        id: item.id || null
+                        id: item.id || null,
+                        // Entries saved before uids existed get one now
+                        uid: item.uid || createUid()
                     }));
                     this._trimHistoryToLimit();
 
@@ -388,55 +400,69 @@
 
             addToHistory(message, luckyNumbers = null, id = null) {
                 const numbers = luckyNumbers || generateLuckyNumbers();
-                this.fortuneHistory.unshift({
+                const item = {
+                    uid: createUid(),
                     message: message,
                     timestamp: Date.now(),
                     isFavorite: false,
                     luckyNumbers: numbers,
                     id: id
-                });
+                };
+                this.fortuneHistory.unshift(item);
 
                 this._trimHistoryToLimit();
 
-                // Increment fortune counter
+                // Lifetime count of cookies cracked; deleting from history doesn't undo a crack
                 this.fortuneCount++;
 
                 this.dataChanged = true;
                 this.saveToStorage();
+                return item;
             }
 
             getFortuneCount() {
                 return this.fortuneCount;
             }
 
-            deleteHistoryItem(index) {
-                if (index >= 0 && index < this.fortuneHistory.length) {
-                    this.fortuneHistory.splice(index, 1);
-
-                    // Decrement fortune counter
-                    if (this.fortuneCount > 0) {
-                        this.fortuneCount--;
-                    }
-
-                    this.dataChanged = true;
-                    this.saveToStorage();
-                    Logger.log(`Deleted history item at index ${index}. New count: ${this.fortuneCount}`);
-                    return true;
-                }
-                return false;
+            getHistoryItem(uid) {
+                return this.fortuneHistory.find(item => item.uid === uid) || null;
             }
 
-            toggleFavorite(index) {
-                if (index >= 0 && index < this.fortuneHistory.length) {
-                    const item = this.fortuneHistory[index];
-                    item.isFavorite = !item.isFavorite;
-
-                    this.dataChanged = true;
-                    this.saveToStorage();
-                    Logger.log(`Toggled favorite for item at index ${index}. isFavorite: ${item.isFavorite}`);
-                    return item.isFavorite;
+            // Returns { item, index } so the deletion can be undone, or null if not found
+            deleteHistoryItem(uid) {
+                const index = this.fortuneHistory.findIndex(item => item.uid === uid);
+                if (index === -1) {
+                    return null;
                 }
-                return false;
+                const [item] = this.fortuneHistory.splice(index, 1);
+
+                this.dataChanged = true;
+                this.saveToStorage();
+                Logger.log(`Deleted history item ${uid}`);
+                return { item, index };
+            }
+
+            restoreHistoryItem({ item, index }) {
+                if (this.getHistoryItem(item.uid)) return;
+                this.fortuneHistory.splice(Math.min(index, this.fortuneHistory.length), 0, item);
+
+                this.dataChanged = true;
+                this.saveToStorage();
+                Logger.log(`Restored history item ${item.uid}`);
+            }
+
+            // Returns the new favourite state, or null if the entry no longer exists
+            toggleFavorite(uid) {
+                const item = this.getHistoryItem(uid);
+                if (!item) {
+                    return null;
+                }
+                item.isFavorite = !item.isFavorite;
+
+                this.dataChanged = true;
+                this.saveToStorage();
+                Logger.log(`Toggled favorite for item ${uid}. isFavorite: ${item.isFavorite}`);
+                return item.isFavorite;
             }
 
             async addMessage() {
@@ -585,6 +611,10 @@
                     historyList: document.getElementById('historyList'),
                     historyEmpty: document.getElementById('historyEmpty'),
                     fortuneCounter: document.getElementById('fortuneCounter'),
+                    historyCount: document.getElementById('historyCount'),
+                    saveFavouriteBtn: document.getElementById('saveFavouriteBtn'),
+                    toast: document.getElementById('toast'),
+                    historyToast: document.getElementById('historyToast'),
                     filterToggle: document.getElementById('filterToggle'),
                     historySearch: document.getElementById('historySearch')
                 };
@@ -620,6 +650,12 @@
                     this.elements.filterToggle,
                     () => this.toggleFavoritesFilter()
                 );
+
+                this.elements.saveFavouriteBtn.addEventListener('click', () => {
+                    if (this.currentUid && this.onToggleFavorite) {
+                        this.onToggleFavorite(this.currentUid);
+                    }
+                });
 
                 this.elements.historySearch.addEventListener('input', (e) => {
                     this.searchQuery = e.target.value;
@@ -756,117 +792,46 @@
                 return copyBtn;
             }
 
-            createHistoryDeleteButton(index, message) {
+            createHistoryDeleteButton(uid) {
                 const deleteBtn = this.createElement('button', 'history-btn history-delete-btn', null, {
                     'aria-label': 'Delete this fortune from history',
                     'title': 'Delete this fortune from history'
                 });
                 deleteBtn.innerHTML = this.createIcon('trash', 16);
 
-                this.addAccessibleClickHandler(deleteBtn, () => {
-                    this.showDeleteConfirmation(index, message);
+                this.addAccessibleClickHandler(deleteBtn, (e) => {
+                    // Ignore repeat clicks while the card is already sliding out
+                    if (deleteBtn.closest('.history-item').classList.contains('deleting')) return;
+                    // Keyboard activation arrives as keydown, or as a click with no pointer (detail 0)
+                    const viaKeyboard = !(e instanceof MouseEvent) || e.detail === 0;
+                    if (this.deleteHandler) {
+                        this.deleteHandler(uid, { viaKeyboard });
+                    }
                 });
 
                 return deleteBtn;
             }
 
-            createHistoryFavoriteButton(index, isFavorite) {
+            createHistoryFavoriteButton(uid, isFavorite) {
                 const iconName = isFavorite ? 'star-filled' : 'star';
                 const classes = isFavorite ? 'history-btn history-favorite-btn favorited' : 'history-btn history-favorite-btn';
-                const label = isFavorite ? 'Remove from favorites' : 'Add to favorites';
 
+                // A toggle button keeps its label; aria-pressed carries the state
                 const favoriteBtn = this.createElement('button', classes, null, {
-                    'aria-label': label,
+                    'type': 'button',
+                    'aria-label': 'Favourite',
                     'aria-pressed': isFavorite.toString(),
-                    'title': label
+                    'title': isFavorite ? 'Remove from favourites' : 'Save as favourite'
                 });
                 favoriteBtn.innerHTML = this.createIcon(iconName, 16);
 
                 this.addAccessibleClickHandler(favoriteBtn, () => {
                     if (this.onToggleFavorite) {
-                        this.onToggleFavorite(index);
+                        this.onToggleFavorite(uid);
                     }
                 });
 
                 return favoriteBtn;
-            }
-
-            showDeleteConfirmation(index, message) {
-                // A native modal <dialog>: it stacks above the history dialog, makes everything
-                // behind it inert, closes on Escape and returns focus to the trigger when closed
-                const dialog = this.createElement('dialog', 'confirmation-dialog', null, {
-                    'role': 'alertdialog',
-                    'aria-labelledby': 'confirmTitle',
-                    'aria-describedby': 'confirmMessage'
-                });
-
-                const title = this.createElement('h3', 'confirmation-title', 'Delete Fortune?', {
-                    'id': 'confirmTitle'
-                });
-
-                // Message preview
-                const messagePreview = message.length > 60
-                    ? message.substring(0, 60) + '...'
-                    : message;
-
-                const dialogMessage = this.createElement(
-                    'p',
-                    'confirmation-message',
-                    'Are you sure you want to delete this fortune?',
-                    { 'id': 'confirmMessage' }
-                );
-
-                const fortunePreview = this.createElement(
-                    'p',
-                    'confirmation-fortune-preview',
-                    `"${messagePreview}"`
-                );
-
-                const buttonsContainer = this.createElement('div', 'confirmation-buttons');
-
-                // Cancel comes first and gets initial focus: the safe choice for a destructive action
-                const cancelBtn = this.createElement('button', 'confirmation-btn confirmation-btn-cancel', 'Cancel', {
-                    'type': 'button',
-                    'autofocus': ''
-                });
-
-                const confirmBtn = this.createElement('button', 'confirmation-btn confirmation-btn-confirm', 'Delete', {
-                    'type': 'button'
-                });
-
-                buttonsContainer.appendChild(cancelBtn);
-                buttonsContainer.appendChild(confirmBtn);
-                dialog.appendChild(title);
-                dialog.appendChild(dialogMessage);
-                dialog.appendChild(fortunePreview);
-                dialog.appendChild(buttonsContainer);
-                document.body.appendChild(dialog);
-
-                let confirmed = false;
-
-                dialog.addEventListener('close', () => {
-                    dialog.remove();
-                    if (confirmed) {
-                        // The trigger button goes away with its card, so focus the search box instead
-                        this.elements.historySearch.focus();
-                        if (this.deleteHandler) {
-                            this.deleteHandler(index);
-                        }
-                    }
-                });
-
-                cancelBtn.addEventListener('click', () => dialog.close());
-                confirmBtn.addEventListener('click', () => {
-                    confirmed = true;
-                    dialog.close();
-                });
-                dialog.addEventListener('click', (e) => {
-                    if (e.target === dialog) {
-                        dialog.close();
-                    }
-                });
-
-                dialog.showModal();
             }
 
             setDeleteHandler(handler) {
@@ -883,8 +848,10 @@
                 this.cookieClickHandler = handler;
             }
 
-            showFortune(message, luckyNumbers = null) {
+            showFortune(message, luckyNumbers = null, uid = null) {
                 this.isCracked = true;
+                this.currentUid = uid;
+                this.setSlipFavourite(uid, false);
                 this.elements.cookieStage.classList.add('cracked');
                 this.elements.fortuneText.textContent = message;
 
@@ -1143,6 +1110,8 @@
 
             // Runs however the dialog closes: close button, Escape or backdrop click
             onHistoryClosed() {
+                // A pending Undo goes with the drawer; the deletion stands
+                this.hideToast();
                 this.isHistoryOpen = false;
                 this.elements.historyToggle.setAttribute('aria-expanded', 'false');
                 this.elements.historyToggle.focus();
@@ -1192,7 +1161,7 @@
                     if (this.searchQuery && this.searchQuery.trim() !== '') {
                         emptyMessage = 'No matches found. Try different keywords.';
                     } else if (this.showFavoritesOnly) {
-                        emptyMessage = 'No favorites yet. Click the star icon to add favorites!';
+                        emptyMessage = 'No favourites yet. Use the star to save fortunes you like.';
                     } else {
                         emptyMessage = 'No fortunes yet. Crack a cookie to begin!';
                     }
@@ -1204,13 +1173,10 @@
                 listElement.hidden = false;
                 listElement.replaceChildren();
 
-                // Render each history item (use original index for operations)
                 filteredData.forEach((item) => {
-                    // Find the original index in the unfiltered data
-                    const originalIndex = historyData.indexOf(item);
                     const classes = item.isFavorite ? 'history-item favorited' : 'history-item';
                     const historyItem = this.createElement('li', classes, null, {
-                        'data-index': originalIndex
+                        'data-uid': item.uid
                     });
 
                     // Highlight matching text if search is active (built as DOM nodes, never as HTML)
@@ -1236,9 +1202,9 @@
                     );
 
                     const actions = this.createElement('div', 'history-item-actions');
-                    const favoriteBtn = this.createHistoryFavoriteButton(originalIndex, item.isFavorite || false);
+                    const favoriteBtn = this.createHistoryFavoriteButton(item.uid, item.isFavorite || false);
                     const copyBtn = this.createHistoryCopyButton(item.message);
-                    const deleteBtn = this.createHistoryDeleteButton(originalIndex, item.message);
+                    const deleteBtn = this.createHistoryDeleteButton(item.uid);
 
                     actions.appendChild(favoriteBtn);
                     actions.appendChild(copyBtn);
@@ -1274,14 +1240,27 @@
 
             refreshHistory() {
                 if (this.isHistoryOpen && this.historyDataProvider) {
+                    // Re-rendering replaces the buttons, so put focus back on the same control
+                    const active = document.activeElement;
+                    const card = active && active.closest && active.closest('.history-item');
+                    const uid = card && card.dataset.uid;
+                    const buttonClass = uid && ['history-favorite-btn', 'history-copy-btn', 'history-delete-btn']
+                        .find(cls => active.classList.contains(cls));
+
                     this.renderHistory(this.historyDataProvider());
+
+                    if (buttonClass) {
+                        const replacement = this.elements.historyList.querySelector(
+                            `.history-item[data-uid="${CSS.escape(uid)}"] .${buttonClass}`);
+                        if (replacement) replacement.focus();
+                    }
                 }
             }
 
             updateFortuneCounter(count) {
                 if (!this.elements.fortuneCounter) return;
 
-                this.elements.fortuneCounter.textContent = `(${count} collected)`;
+                this.elements.fortuneCounter.textContent = `${count} ${count === 1 ? 'cookie' : 'cookies'} cracked so far`;
 
                 // Animate the bump
                 this.elements.fortuneCounter.classList.add('counter-bump');
@@ -1290,14 +1269,12 @@
                 }, 300);
             }
 
-            deleteHistoryItemWithAnimation(index) {
-                // index refers to the unfiltered history, so look the card up by its data-index
-                // rather than by its position in the (possibly filtered) list
-                const itemToDelete = this.elements.historyList.querySelector(`.history-item[data-index="${index}"]`);
+            deleteHistoryItemWithAnimation(uid, options) {
+                const itemToDelete = this.elements.historyList.querySelector(`.history-item[data-uid="${CSS.escape(uid)}"]`);
 
                 const completeDeletion = () => {
                     if (this.onDeleteComplete) {
-                        this.onDeleteComplete(index);
+                        this.onDeleteComplete(uid, options);
                     }
                 };
 
@@ -1318,6 +1295,95 @@
 
             setOnToggleFavorite(handler) {
                 this.onToggleFavorite = handler;
+            }
+
+            // Reflect a fortune's favourite state on the slip, if that fortune is the one showing
+            setSlipFavourite(uid, isFavorite) {
+                if (uid !== this.currentUid) return;
+                const button = this.elements.saveFavouriteBtn;
+                button.setAttribute('aria-pressed', String(isFavorite));
+                button.classList.toggle('saved', isFavorite);
+                button.querySelector('.save-icon').innerHTML = this.createIcon(isFavorite ? 'star-filled' : 'star', 16);
+            }
+
+            updateHistoryCount(count) {
+                this.elements.historyCount.textContent = count;
+            }
+
+            // Brief confirmation, shown visually and announced politely, optionally with an
+            // action button such as Undo. When a dialog is open everything outside it is inert,
+            // so the drawer has its own message area. Returns the action button, if any.
+            showToast(message, { actionLabel = null, onAction = null, duration = CONFIG.TIMEOUTS.TOAST_DURATION } = {}) {
+                this.hideToast();
+
+                const region = this.isHistoryOpen ? this.elements.historyToast : this.elements.toast;
+                const text = this.createElement('span', 'toast-text', message);
+                region.replaceChildren(text);
+
+                let actionButton = null;
+                if (actionLabel) {
+                    actionButton = this.createElement('button', 'toast-action', actionLabel, { 'type': 'button' });
+                    actionButton.addEventListener('click', () => {
+                        this.hideToast();
+                        if (onAction) onAction();
+                    });
+                    region.appendChild(actionButton);
+                }
+                region.classList.add('visible');
+
+                // Stay up while the pointer is over the message or a keyboard user is on its
+                // button (WCAG 2.2.1), and count down the remaining time once they leave
+                const toast = { region, remaining: duration, startedAt: 0, timer: null, hovered: false, focused: false, listeners: null };
+                const start = () => {
+                    if (toast.hovered || toast.focused || toast.timer) return;
+                    toast.startedAt = Date.now();
+                    toast.timer = setTimeout(() => this.hideToast(), toast.remaining);
+                };
+                const pause = () => {
+                    if (!toast.timer) return;
+                    clearTimeout(toast.timer);
+                    toast.timer = null;
+                    toast.remaining -= Date.now() - toast.startedAt;
+                };
+                // (focusin/focusout have no on* properties, so use listeners, removed on hide)
+                toast.listeners = new AbortController();
+                const { signal } = toast.listeners;
+                region.addEventListener('mouseenter', () => { toast.hovered = true; pause(); }, { signal });
+                region.addEventListener('mouseleave', () => { toast.hovered = false; start(); }, { signal });
+                region.addEventListener('focusin', () => { toast.focused = true; pause(); }, { signal });
+                region.addEventListener('focusout', (e) => {
+                    if (region.contains(e.relatedTarget)) return;
+                    toast.focused = false;
+                    start();
+                }, { signal });
+
+                this.activeToast = toast;
+                start();
+                return actionButton;
+            }
+
+            hideToast() {
+                const toast = this.activeToast;
+                if (!toast) return;
+                this.activeToast = null;
+                clearTimeout(toast.timer);
+
+                const { region } = toast;
+                const hadFocus = region.contains(document.activeElement);
+                toast.listeners.abort();
+                region.classList.remove('visible');
+                region.replaceChildren();
+
+                // Don't leave keyboard focus on a button that just disappeared
+                if (hadFocus && this.isHistoryOpen) {
+                    this.elements.historySearch.focus();
+                }
+            }
+
+            focusHistoryDeleteButton(uid) {
+                const button = this.elements.historyList.querySelector(
+                    `.history-item[data-uid="${CSS.escape(uid)}"] .history-delete-btn`);
+                if (button) button.focus();
             }
         }
 
@@ -1349,16 +1415,16 @@
                 });
 
                 // Set up delete handler
-                this.uiController.setDeleteHandler((index) => {
-                    this.uiController.deleteHistoryItemWithAnimation(index);
+                this.uiController.setDeleteHandler((uid, options) => {
+                    this.uiController.deleteHistoryItemWithAnimation(uid, options);
                 });
 
-                this.uiController.setOnDeleteComplete((index) => {
-                    this.handleDeleteHistoryItem(index);
+                this.uiController.setOnDeleteComplete((uid, options) => {
+                    this.handleDeleteHistoryItem(uid, options);
                 });
 
-                this.uiController.setOnToggleFavorite((index) => {
-                    this.handleToggleFavorite(index);
+                this.uiController.setOnToggleFavorite((uid) => {
+                    this.handleToggleFavorite(uid);
                 });
 
                 window.addEventListener('online', () => {
@@ -1386,12 +1452,10 @@
                     const result = this.messageManager.getNextMessage();
                     const { id, message } = result;
                     const luckyNumbers = generateLuckyNumbers();
-                    this.messageManager.addToHistory(message, luckyNumbers, id);
-                    this.uiController.showFortune(message, luckyNumbers);
+                    const item = this.messageManager.addToHistory(message, luckyNumbers, id);
+                    this.uiController.showFortune(message, luckyNumbers, item.uid);
 
-                    // Update fortune counter
-                    const count = this.messageManager.getFortuneCount();
-                    this.uiController.updateFortuneCounter(count);
+                    this.updateCounts();
 
                     // Refresh history panel if it's open
                     this.uiController.refreshHistory();
@@ -1400,44 +1464,71 @@
                 }
             }
 
-            handleToggleFavorite(index) {
+            updateCounts() {
+                this.uiController.updateFortuneCounter(this.messageManager.getFortuneCount());
+                this.uiController.updateHistoryCount(this.messageManager.fortuneHistory.length);
+            }
+
+            handleToggleFavorite(uid) {
                 try {
-                    const isFavorite = this.messageManager.toggleFavorite(index);
+                    const isFavorite = this.messageManager.toggleFavorite(uid);
+                    if (isFavorite === null) {
+                        this.uiController.showToast('This fortune was deleted from your history');
+                        return;
+                    }
 
-                    // Refresh history panel to reflect changes
+                    this.uiController.setSlipFavourite(uid, isFavorite);
                     this.uiController.refreshHistory();
+                    this.uiController.showToast(isFavorite ? 'Saved to favourites' : 'Removed from favourites');
 
-                    Logger.log(`Toggled favorite at index ${index}. Now ${isFavorite ? 'favorited' : 'unfavorited'}`);
+                    Logger.log(`Toggled favorite ${uid}. Now ${isFavorite ? 'favorited' : 'unfavorited'}`);
                 } catch (error) {
                     Logger.error('Error toggling favorite:', error);
                 }
             }
 
-            handleDeleteHistoryItem(index) {
+            handleDeleteHistoryItem(uid, { viaKeyboard = false } = {}) {
                 try {
-                    const success = this.messageManager.deleteHistoryItem(index);
-                    if (success) {
-                        // Update counter display
-                        const count = this.messageManager.getFortuneCount();
-                        this.uiController.updateFortuneCounter(count);
-
-                        // Refresh history panel to reflect changes
-                        this.uiController.refreshHistory();
-
-                        Logger.log(`Successfully deleted history item at index ${index}`);
-                    } else {
-                        Logger.error(`Failed to delete history item at index ${index}`);
+                    const removed = this.messageManager.deleteHistoryItem(uid);
+                    if (!removed) {
+                        Logger.error(`Failed to delete history item ${uid}`);
+                        return;
                     }
+                    this.uiController.setSlipFavourite(uid, false);
+                    this.updateCounts();
+                    this.uiController.refreshHistory();
+
+                    const undoButton = this.uiController.showToast('Fortune deleted', {
+                        actionLabel: 'Undo',
+                        duration: CONFIG.TIMEOUTS.UNDO_DURATION,
+                        onAction: () => this.handleUndoDelete(removed)
+                    });
+                    // Keyboard focus was on the delete button, which went with its card: move it
+                    // to Undo, which then stays up until focus leaves it. Pointer users keep
+                    // the timed message.
+                    if (viaKeyboard) {
+                        undoButton.focus();
+                    }
+
+                    Logger.log(`Successfully deleted history item ${uid}`);
                 } catch (error) {
                     Logger.error('Failed to delete history item: ' + error.message);
                 }
             }
 
+            handleUndoDelete(removed) {
+                const { item } = removed;
+                this.messageManager.restoreHistoryItem(removed);
+                this.uiController.setSlipFavourite(item.uid, item.isFavorite);
+                this.updateCounts();
+                this.uiController.refreshHistory();
+                this.uiController.focusHistoryDeleteButton(item.uid);
+                this.uiController.showToast('Fortune restored');
+            }
+
             async initialize() {
                 try {
-                    // Initialize counter display with current count
-                    const count = this.messageManager.getFortuneCount();
-                    this.uiController.updateFortuneCounter(count);
+                    this.updateCounts();
 
                     await this.messageManager.fillQueue();
                 } catch (error) {

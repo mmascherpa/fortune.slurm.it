@@ -11,15 +11,16 @@
     <a href="#cookieContainer" class="sr-only focusable">Skip to fortune cookie</a>
 
     <!-- History Toggle Button -->
+    <!-- Accessible name comes from its text: "History 3 fortunes" -->
     <button class="history-toggle"
             id="historyToggle"
             type="button"
-            aria-label="Fortune history"
-            title="Fortune history"
             aria-haspopup="dialog"
             aria-expanded="false"
             aria-controls="historyPanel">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        <span class="history-toggle-label">History</span>
+        <span class="history-count"><span id="historyCount">0</span><span class="sr-only"> fortunes</span></span>
     </button>
 
     <!-- History Panel: a modal <dialog>, so the page behind it is inert while it is open -->
@@ -28,9 +29,10 @@
             aria-labelledby="historyTitle">
         <div class="history-header">
             <div class="history-header-top">
-                <h2 class="history-title" id="historyTitle">
-                    Fortune History <span class="fortune-counter" id="fortuneCounter">(0 collected)</span>
-                </h2>
+                <div>
+                    <h2 class="history-title" id="historyTitle">Fortune history</h2>
+                    <p class="fortune-counter" id="fortuneCounter">0 cookies cracked so far</p>
+                </div>
                 <button class="history-close"
                         id="historyClose"
                         type="button"
@@ -52,7 +54,7 @@
                         id="filterToggle"
                         type="button"
                         aria-pressed="false">
-                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Favorites Only
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Favourites only
                 </button>
             </div>
         </div>
@@ -60,6 +62,8 @@
             <ul class="history-list" id="historyList" aria-labelledby="historyTitle"></ul>
             <p class="history-empty" id="historyEmpty">No fortunes yet. Crack a cookie to begin!</p>
         </div>
+        <!-- Confirmations while the drawer is open (the page-level one is inert behind it) -->
+        <div class="toast" id="historyToast" role="status"></div>
     </dialog>
 
     <main role="main">
@@ -93,6 +97,15 @@
                             <p class="lucky-numbers-text" id="luckyNumbers"></p>
                         </div>
                     </blockquote>
+                    <div class="fortune-slip-actions">
+                        <button class="save-favourite-btn"
+                                id="saveFavouriteBtn"
+                                type="button"
+                                aria-pressed="false">
+                            <span class="save-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
+                            Save favourite
+                        </button>
+                    </div>
                 </section>
             </div>
 
@@ -119,6 +132,9 @@
             </a>
         </div>
     </main>
+
+    <!-- Brief confirmations such as "Saved to favourites" -->
+    <div class="toast" id="toast" role="status"></div>
 
     <script src="app.js"></script>
 </body>

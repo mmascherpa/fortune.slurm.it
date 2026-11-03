@@ -65,12 +65,12 @@ test.describe('automated accessibility check (axe-core)', () => {
         await expectNoViolations(page);
     });
 
-    test('delete confirmation', async ({ page }) => {
+    test('undo message after deleting', async ({ page }) => {
         await crackCookie(page);
         await page.keyboard.press('Escape');
         await openHistory(page);
         await page.locator('.history-delete-btn').click();
-        await expect(page.locator('.confirmation-dialog')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
         await expectNoViolations(page);
     });
 });
@@ -121,7 +121,7 @@ test.describe('history drawer', () => {
 
     test('open drawer is a modal dialog and the page behind is inert', async ({ page }) => {
         await openHistory(page);
-        const dialog = page.getByRole('dialog', { name: /Fortune History/ });
+        const dialog = page.getByRole('dialog', { name: /Fortune history/ });
         await expect(dialog).toBeVisible();
         // Everything outside the dialog leaves the accessibility tree while it is open
         const tree = await accessibleNames(page);
@@ -164,7 +164,7 @@ test.describe('history drawer', () => {
 
     test('favourites filter keeps a constant label and reports its state', async ({ page }) => {
         await openHistory(page);
-        const filter = page.getByRole('button', { name: 'Favorites Only' });
+        const filter = page.getByRole('button', { name: 'Favourites only' });
         await expect(filter).toHaveAttribute('aria-pressed', 'false');
         await filter.click();
         await expect(filter).toHaveAttribute('aria-pressed', 'true');
@@ -176,15 +176,6 @@ test.describe('history drawer with fortunes', () => {
 
     test('fortunes are a real list', async ({ page }) => {
         await openHistory(page);
-        await expect(page.getByRole('list', { name: /Fortune History/ }).getByRole('listitem')).toHaveCount(2);
-    });
-
-    test('cancelling a delete returns focus to the delete button', async ({ page }) => {
-        await openHistory(page);
-        const deleteButton = page.locator('.history-delete-btn').first();
-        await deleteButton.click();
-        await page.getByRole('button', { name: 'Cancel' }).click();
-        await expect(deleteButton).toBeFocused();
-        await expect(page.locator('#historyPanel')).toHaveAttribute('open');
+        await expect(page.getByRole('list', { name: /Fortune history/ }).getByRole('listitem')).toHaveCount(2);
     });
 });
