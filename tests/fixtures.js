@@ -54,9 +54,22 @@ async function closeFortune(page) {
     await page.locator('#closeBtn').click();
 }
 
+// Wait for running CSS animations and transitions to finish, so checks see the settled
+// layout rather than, say, a fortune slip that is still growing from zero size. Decorative
+// aria-hidden elements (the falling particles, spawned continuously) are ignored.
+async function waitForAnimations(page) {
+    await page.evaluate(() => Promise.all(document.getAnimations()
+        .filter(animation => {
+            const target = animation.effect && animation.effect.target;
+            return target && !target.closest('[aria-hidden="true"]')
+                && animation.effect.getComputedTiming().iterations !== Infinity;
+        })
+        .map(animation => animation.finished.catch(() => {}))));
+}
+
 async function openHistory(page) {
     await page.locator('#historyToggle').click();
     await base.expect(page.locator('#historyPanel')).toHaveAttribute('open');
 }
 
-module.exports = { test, expect: base.expect, makeHistoryItem, crackCookie, closeFortune, openHistory };
+module.exports = { test, expect: base.expect, makeHistoryItem, crackCookie, closeFortune, openHistory, waitForAnimations };
