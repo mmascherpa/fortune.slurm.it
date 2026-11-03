@@ -62,7 +62,6 @@ test.describe('saving from the fortune slip', () => {
     test('saving after the fortune was deleted from history explains why nothing happened', async ({ page }) => {
         await openHistory(page);
         await page.locator('.history-delete-btn').first().click();
-        await page.locator('.confirmation-btn-confirm').click();
         await expect(page.locator('.history-item')).toHaveCount(0);
         await page.locator('#historyClose').click();
         await saveButton(page).click();
@@ -126,7 +125,6 @@ test.describe('counts', () => {
         await openHistory(page);
         await expect(page.locator('#fortuneCounter')).toHaveText('1 cookie cracked so far');
         await page.locator('.history-delete-btn').first().click();
-        await page.locator('.confirmation-btn-confirm').click();
         await expect(page.locator('.history-item')).toHaveCount(3);
         await expect(historyButton(page).locator('#historyCount')).toHaveText('3');
         await expect(page.locator('#fortuneCounter')).toHaveText('1 cookie cracked so far');
