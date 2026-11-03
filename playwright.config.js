@@ -2,6 +2,8 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 const PORT = 4173;
+// Serve the repo by default; CI sets SITE_DIR=_site to test the published files only
+const SITE_DIR = process.env.SITE_DIR || '.';
 
 module.exports = defineConfig({
     testDir: './tests',
@@ -19,7 +21,7 @@ module.exports = defineConfig({
     ],
     // The site is plain static files, so Python's built-in server is enough
     webServer: {
-        command: `python3 -m http.server ${PORT}`,
+        command: `python3 -m http.server ${PORT} --directory ${SITE_DIR}`,
         url: `http://localhost:${PORT}`,
         reuseExistingServer: !process.env.CI
     }
