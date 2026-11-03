@@ -1,9 +1,12 @@
 const AxeBuilder = require('@axe-core/playwright').default;
-const { test, expect, makeHistoryItem, crackCookie, openHistory } = require('./fixtures');
+const { test, expect, makeHistoryItem, crackCookie, openHistory, waitForAnimations } = require('./fixtures');
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
 async function expectNoViolations(page) {
+    // Animations must be finished first: mid-transition, buttons are briefly smaller than
+    // they really are and axe reports target-size violations that users never see
+    await waitForAnimations(page);
     const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
     const summary = results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(', ')}`);
     expect(summary).toEqual([]);
