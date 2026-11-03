@@ -1,4 +1,4 @@
-const { test, expect, makeHistoryItem, crackCookie, closeFortune, openHistory } = require('./fixtures');
+const { test, expect, makeHistoryItem, crackCookie, crackAnother, openHistory } = require('./fixtures');
 
 // 30 fortunes, the 5 oldest of which are favourites
 const THIRTY_WITH_FIVE_FAVOURITES = Array.from({ length: 30 }, (_, i) => makeHistoryItem(i, i >= 25));
@@ -21,9 +21,9 @@ test.describe('history panel', () => {
 
     test('favourites survive new fortunes pushing out old ones', async ({ page }) => {
         await page.locator('#historyClose').click();
-        for (let i = 0; i < 22; i++) {
-            await crackCookie(page);
-            await closeFortune(page);
+        await crackCookie(page);
+        for (let i = 0; i < 21; i++) {
+            await crackAnother(page);
         }
         await openHistory(page);
         await page.locator('#filterToggle').click();
