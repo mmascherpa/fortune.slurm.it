@@ -12,6 +12,7 @@ SITE_FILES=(
     app.js
     styles.css
     favicon.svg
+    vendor          # canvas-confetti, with its licence
 )
 
 cd "$(dirname "$0")/.."
